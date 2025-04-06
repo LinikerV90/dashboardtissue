@@ -6,6 +6,13 @@
   <title>Dashboard Tissue</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --azul-suzano: #0051A2;
+      --azul-claro: #00B2E2;
+      --branco: #ffffff;
+      --cinza-fundo: #f4f6f8;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -14,85 +21,94 @@
 
     body {
       font-family: 'Inter', sans-serif;
+      background-color: var(--cinza-fundo);
+      color: #333;
       display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background: linear-gradient(135deg, #e0f2f1, #b2ebf2);
-      animation: fadeIn 1s ease-in;
+      flex-direction: column;
+      min-height: 100vh;
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: scale(0.95); }
-      to { opacity: 1; transform: scale(1); }
+    header {
+      background-color: var(--branco);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    header img {
+      height: 50px;
     }
 
     .container {
-      background-color: #ffffffdd;
-      padding: 40px 30px;
-      border-radius: 16px;
+      padding: 40px 20px;
       text-align: center;
-      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-      max-width: 400px;
-      width: 90%;
+      flex: 1;
     }
 
-    h1 {
-      font-size: 28px;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 15px;
-    }
-
-    p {
-      font-size: 16px;
-      color: #555;
-      margin-bottom: 30px;
-    }
-
-    a {
-      text-decoration: none;
+    .buttons {
+      margin-top: 30px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
     }
 
     .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 12px 24px;
-      background-color: #0073e6;
-      color: #fff;
-      font-size: 16px;
-      font-weight: 500;
+      background-color: var(--azul-suzano);
+      color: var(--branco);
       border: none;
+      padding: 15px 25px;
       border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
       cursor: pointer;
       transition: background 0.3s ease;
+      min-width: 220px;
     }
 
     .btn:hover {
-      background-color: #005bb5;
+      background-color: var(--azul-claro);
     }
 
-    .btn svg {
-      width: 20px;
-      height: 20px;
-      fill: #fff;
+    footer {
+      background-color: #fff;
+      padding: 15px;
+      text-align: center;
+      font-size: 14px;
+      color: #555;
+      box-shadow: 0 -2px 6px rgba(0,0,0,0.05);
     }
   </style>
 </head>
 <body>
+
+  <header>
+    <img src="https://logospng.org/download/suzano-papel-e-celulose/logo-suzano-papel-e-celulose-4096.png" alt="Suzano Logo" />
+  </header>
+
   <div class="container">
-    <h1>Bem-vindo ao Dashboard Tissue</h1>
-    <p>Clique no botão abaixo para acessar o sistema:</p>
-    <a href="https://sites.google.com/view/conversao-mu/inicio" target="_blank">
-      <button class="btn">
-        <!-- ícone: login -->
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-          <path d="M10 17l5-5-5-5v10zm9-13H5c-1.1 0-2 .9-2 2v4h2V6h14v12H5v-4H3v4c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z"/>
-        </svg>
-        Acessar Dashboard
-      </button>
-    </a>
+    <h1>Dashboard Tissue</h1>
+    <p>Selecione uma área para visualizar os dados:</p>
+
+    <div class="buttons">
+      <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTtkpQZkdZLmk2pC_S4DN-Ypap9ser_9nC_CnPFtIuT0gROXGAtZyhajeUbKmK90NwToDnDfPA-wORV/pubhtml?gid=2120892425&single=true" target="_blank">
+        <button class="btn">Máquina Tissue</button>
+      </a>
+
+      <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSfqNOPwM1MnId3TmoUQDi10Afe9dpoRV-HypJj_mBH54JX0DlOkaA-NZmsveUOpmXjcCPWP25-sIFK/pubhtml?gid=1827549595&single=true" target="_blank">
+        <button class="btn">Conversão Tissue</button>
+      </a>
+
+      <a href="https://9e60-177-47-8-166.ngrok-free.app/ui/#!/0?socketid=o4mNerdlK5D174QdAACv" target="_blank">
+        <button class="btn">Motores Conversão</button>
+      </a>
+    </div>
   </div>
+
+  <footer>
+    Desenvolvido por Liniker Venturini – ©2025
+  </footer>
+
 </body>
 </html>
