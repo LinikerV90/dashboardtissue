@@ -1,3 +1,4 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -41,30 +42,46 @@
     }
 
     .container {
-      padding: 40px 20px;
-      text-align: center;
       flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    .content-box {
+      background-color: #fff;
+      padding: 40px 30px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      animation: fadeIn 0.8s ease-in-out;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
     }
 
     .buttons {
       margin-top: 30px;
       display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-      justify-content: center;
+      flex-direction: column;
+      gap: 15px;
     }
 
     .btn {
       background-color: var(--azul-suzano);
       color: var(--branco);
       border: none;
-      padding: 15px 25px;
+      padding: 15px;
       border-radius: 8px;
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
       transition: background 0.3s ease;
-      min-width: 220px;
     }
 
     .btn:hover {
@@ -84,25 +101,27 @@
 <body>
 
   <header>
-    <img src="https://logospng.org/download/suzano-papel-e-celulose/logo-suzano-papel-e-celulose-4096.png" alt="Suzano Logo" />
+    <img src="logo-suzano.png" alt="Suzano Logo" />
   </header>
 
   <div class="container">
-    <h1>Dashboard Tissue</h1>
-    <p>Selecione uma área para visualizar os dados:</p>
+    <div class="content-box">
+      <h1>Dashboard Tissue</h1>
+      <p>Selecione uma área para visualizar os dados:</p>
 
-    <div class="buttons">
-      <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTtkpQZkdZLmk2pC_S4DN-Ypap9ser_9nC_CnPFtIuT0gROXGAtZyhajeUbKmK90NwToDnDfPA-wORV/pubhtml?gid=2120892425&single=true" target="_blank">
-        <button class="btn">Máquina Tissue</button>
-      </a>
+      <div class="buttons">
+        <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vTtkpQZkdZLmk2pC_S4DN-Ypap9ser_9nC_CnPFtIuT0gROXGAtZyhajeUbKmK90NwToDnDfPA-wORV/pubhtml?gid=2120892425&single=true" target="_blank">
+          <button class="btn">Máquina Tissue</button>
+        </a>
 
-      <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSfqNOPwM1MnId3TmoUQDi10Afe9dpoRV-HypJj_mBH54JX0DlOkaA-NZmsveUOpmXjcCPWP25-sIFK/pubhtml?gid=1827549595&single=true" target="_blank">
-        <button class="btn">Conversão Tissue</button>
-      </a>
+        <a href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSfqNOPwM1MnId3TmoUQDi10Afe9dpoRV-HypJj_mBH54JX0DlOkaA-NZmsveUOpmXjcCPWP25-sIFK/pubhtml?gid=1827549595&single=true" target="_blank">
+          <button class="btn">Conversão Tissue</button>
+        </a>
 
-      <a href="https://9e60-177-47-8-166.ngrok-free.app/ui/#!/0?socketid=o4mNerdlK5D174QdAACv" target="_blank">
-        <button class="btn">Motores Conversão</button>
-      </a>
+        <a href="motores.html">
+          <button class="btn">Motores Conversão</button>
+        </a>
+      </div>
     </div>
   </div>
 
