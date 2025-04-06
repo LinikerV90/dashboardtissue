@@ -1,0 +1,32 @@
+<!-- conversao.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Conversão Tissue</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background-color: #f4f6f8;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+  <script>
+    setInterval(() => {
+      const iframe = document.getElementById('dashboard');
+      iframe.src = iframe.src;
+    }, 60000);
+  </script>
+</head>
+<body>
+  <iframe id="dashboard" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSfqNOPwM1MnId3TmoUQDi10Afe9dpoRV-HypJj_mBH54JX0DlOkaA-NZmsveUOpmXjcCPWP25-sIFK/pubhtml?gid=1827549595&single=true"></iframe>
+</body>
+</html>
