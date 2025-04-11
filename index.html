@@ -36,6 +36,17 @@
       align-items: center;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 60px;
+    }
+    
+    .coluna {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
 
     header img {
       height: 50px;
@@ -118,23 +129,20 @@
       <h1>Dashboard Tissue</h1>
       <p>Selecione uma área para visualizar os dados:</p>
 
-      <div class="buttons">
-        <a href="maquina.html">
-          <button class="btn">Máquina Tissue</button>
-        </a>
-
-        <a href="conversao.html">
-          <button class="btn">Conversão Tissue</button>
-        </a>
-
-        <a href="https://9e60-177-47-8-166.ngrok-free.app/ui/" target="_blank">
-          <button class="btn">Motores Conversão</button>
-        </a>
-
+        <div class="buttons">
+      <div class="coluna">
+        <a href="maquina.html"><button class="btn">Máquina Tissue</button></a>
         <a href="https://9e60-177-47-8-166.ngrok-free.app/ui/#!/17?socketid=5vTY_U1AHhFFNib5AALk" target="_blank">
           <button class="btn">Motores Máquina</button>
         </a>
       </div>
+      <div class="coluna">
+        <a href="conversao.html"><button class="btn">Conversão Tissue</button></a>
+        <a href="https://9e60-177-47-8-166.ngrok-free.app/ui/" target="_blank">
+          <button class="btn">Motores Conversão</button>
+        </a>
+      </div>
+    </div>
     </div>
   </div>
 
