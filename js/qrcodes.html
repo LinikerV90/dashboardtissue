@@ -5,13 +5,12 @@
   <meta charset="UTF-8" />
   <title>Gerar QRCodes dos Motores – SERVOS</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <!-- Biblioteca de QRCode (client-side, sem dependências) -->
-  https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js</script>
+
+  <!-- QRCode LIB: PRECISA vir antes do seu script principal -->
+  <script/cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js</script>
+
   <style>
-    :root {
-      --azul-suzano: #0051A2;
-      --cinza: #f2f4f7;
-    }
+    :root { --azul-suzano: #0051A2; --cinza: #f2f4f7; }
     body { font-family: Inter, Arial, sans-serif; margin: 24px; background: var(--cinza); }
     h1 { margin: 0 0 8px; color: var(--azul-suzano); }
     .desc { margin: 0 0 16px; color: #333; }
@@ -44,16 +43,19 @@
     </div>
     <div class="bar">
       <label for="baseUrl"><strong>Base do link</strong></label>
+      <!-- ATENÇÃO: sem /br/ -->
       <input id="baseUrl" type="text" value="https://dashboardtissue.com.br/ar.html?motor=" />
     </div>
 
-    <!-- ✅ Botões corretos -->
+    <!-- Botões com IDs -> exigidos pelo JS -->
     <div class="bar">
-      <a id="btnLoad" class="btn" href    <a id="btnDownloadAll" class="btn" href <p class="small">
+      #Ler planilha e gerar QRs</a>
+      <a id="btnDownloadAlla>
+    </div>
+
+    <p class="small">
       Obs.: é necessário que a planilha esteja com “Qualquer pessoa com o link pode visualizar” ou
       <em>Publish to the Web</em> para leitura pública pelo navegador.
-      <a href="https://basescripts.com/wp-content/uploads/2021/08/Google-Sheet-Data-as-JSON-Guide.pdf" target="_blank">[guia GViz]</a>
-      <a href="https://expertbeacon.com/how-to-use-google-sheets-as-a-json-endpoint/" target="_blank">[Sheets como endpoint]</a>
     </p>
   </div>
 
@@ -61,164 +63,122 @@
   <div id="grid" class="grid" style="display:none;"></div>
   <p class="meta">Dica: após gerar, clique em <em>Baixar PNG</em> para salvar cada QR. Você pode imprimir e afixar nos motores.</p>
 
-<script>
-/* Utilitário que:
- * 1) Busca a coluna A (IDs dos motores) via GViz out:json (Sheets -> JSON)  [1](https://basescripts.com/wp-content/uploads/2021/08/Google-Sheet-Data-as-JSON-Guide.pdf)
- * 2) Gera QRs com https://dashboardtissue.com.br/ar.html?motor=ID
- * 3) Permite baixar PNG individual e ZIP com todos
- */
+  <!-- Seu script PRINCIPAL (vem DEPOIS dos elementos do DOM) -->
+  <script>
+    async function fetchMotorIds(sheetId, sheetName) {
+      const tq = "select A where A is not null";
+      const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?sheet=${encodeURIComponent(sheetName)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
+      const res = await fetch(url);
+      const txt = await res.text();
+      const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}') + 1);
+      const obj = JSON.parse(jsonStr);
+      const rows = obj?.table?.rows || [];
+      const ids = rows
+        .map(r => (r.c && r.c[0] && r.c[0].v != null) ? String(r.c[0].v).trim() : null)
+        .filter(v => v && v.length > 0);
+      const seen = new Set(); const unique = [];
+      for (const id of ids) { if (!seen.has(id)) { seen.add(id); unique.push(id); } }
+      return unique;
+    }
 
-async function fetchMotorIds(sheetId, sheetName) {
-  // Consulta GViz: select A onde A não é vazio
-  const tq = "select A where A is not null";
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?sheet=${encodeURIComponent(sheetName)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
-  const res = await fetch(url);
-  const txt = await res.text();
+    function makeQR(container, text, label) {
+      const wrap = document.createElement('div');
+      wrap.className = 'item';
 
-  // O retorno vem com um prefixo/sufixo; removemos para obter JSON puro.  [1](https://basescripts.com/wp-content/uploads/2021/08/Google-Sheet-Data-as-JSON-Guide.pdf)
-  const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}') + 1);
-  const obj = JSON.parse(jsonStr);
+      const title = document.createElement('div');
+      title.className = 'motor';
+      title.textContent = label || text;
+      wrap.appendChild(title);
 
-  const rows = obj?.table?.rows || [];
-  const ids = rows
-    .map(r => (r.c && r.c[0] && r.c[0].v != null) ? String(r.c[0].v).trim() : null)
-    .filter(v => v && v.length > 0);
+      const qrel = document.createElement('div');
+      new QRCode(qrel, { text, width: 256, height: 256, correctLevel: QRCode.CorrectLevel.H });
+      wrap.appendChild(qrel);
 
-  // Remove duplicados, mantendo ordem
-  const seen = new Set();
-  const unique = [];
-  for (const id of ids) {
-    if (!seen.has(id)) { seen.add(id); unique.push(id); }
-  }
-  return unique;
-}
+      const a = document.createElement('a');
+      a.className = 'btn';
+      a.textContent = 'Baixar PNG';
+      a.href = '#';
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const img = qrel.querySelector('img') || qrel.querySelector('canvas');
+        const dataUrl = img?.src || (img ? img.toDataURL('image/png') : null);
+        if (!dataUrl) return;
+        const link = document.createElement('a');
+        link.download = `${(label||text).replace(/[^a-zA-Z0-9_-]/g,'_')}.png`;
+        link.href = dataUrl;
+        link.click();
+      });
+      wrap.appendChild(a);
 
-function makeQR(container, text) {
-  const wrap = document.createElement('div');
-  const title = document.createElement('div');
-  title.className = 'motor';
-  title.textContent = text;
-  wrap.appendChild(title);
+      container.appendChild(wrap);
+    }
 
-  const qrel = document.createElement('div');
-  new QRCode(qrel, {
-    text: text,
-    width: 256, height: 256,
-    correctLevel: QRCode.CorrectLevel.H
-  });
-  wrap.appendChild(qrel);
+    async function generateZIPAll() {
+      if (!window.JSZip) {
+        await Promise.all([
+          new Promise((res, rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'; s.onload=res; s.onerror=rej; document.body.appendChild(s); }),
+          new Promise((res, rej)=>{ const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js'; s.onload=res; s.onerror=rej; document.body.appendChild(s); })
+        ]);
+      }
+      const zip = new JSZip();
+      const items = document.querySelectorAll('.grid .item');
+      for (const item of items) {
+        const name = item.querySelector('.motor').textContent;
+        const qrel = item.querySelector('div:nth-child(2)');
+        const img = qrel.querySelector('img') || qrel.querySelector('canvas');
+        const dataUrl = img?.src || (img ? img.toDataURL('image/png') : null);
+        if (!dataUrl) continue;
+        const base64 = dataUrl.split(',')[1];
+        zip.file(`${name.replace(/[^a-zA-Z0-9_-]/g,'_')}.png`, base64, {base64:true});
+      }
+      const blob = await zip.generateAsync({type:'blob'});
+      saveAs(blob, 'QRCodes_SERVOS.zip');
+    }
 
-  const a = document.createElement('a');
-  a.className = 'btn';
-  a.textContent = 'Baixar PNG';
-  a.href = '#';
-  a.addEventListener('click', (e) => {
-    e.preventDefault();
-    downloadPNG(qrel, text.replace(/[^a-zA-Z0-9_-]/g,'_'));
-  });
-  wrap.appendChild(a);
+    function main() {
+      const sheetIdInput = document.getElementById('sheetId');
+      const sheetNameInput = document.getElementById('sheetName');
+      const baseUrlInput  = document.getElementById('baseUrl');
+      const btnLoad = document.getElementById('btnLoad');
+      const btnZip  = document.getElementById('btnDownloadAll');
+      const status  = document.getElementById('status');
+      const grid    = document.getElementById('grid');
 
-  container.appendChild(wrap);
-}
+      btnLoad.addEventListener('click', async (e) => {
+        e.preventDefault();
+        status.className = 'loading';
+        status.textContent = 'Carregando dados da planilha...';
+        try {
+          const sheetId = sheetIdInput.value.trim();
+          const sheetName = sheetNameInput.value.trim();
+          const base = baseUrlInput.value.trim();
+          const ids = await fetchMotorIds(sheetId, sheetName);
+          if (!ids.length) throw new Error('Nenhum ID encontrado na coluna A.');
 
-function downloadPNG(qrel, name) {
-  const img = qrel.querySelector('img');
-  const canvas = qrel.querySelector('canvas');
-  const dataUrl = img?.src || (canvas ? canvas.toDataURL('image/png') : null);
-  if (!dataUrl) return;
-  const link = document.createElement('a');
-  link.download = `${name}.png`;
-  link.href = dataUrl;
-  link.click();
-}
+          grid.innerHTML = '';
+          grid.style.display = 'grid';
+          status.style.display = 'none';
 
-async function generateZIPAll() {
-  // Cria ZIP em client-side usando JSZip (CDN)
-  if (!window.JSZip) {
-    await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
-    await loadScript('https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js');
-  }
-  const zip = new JSZip();
-  const items = document.querySelectorAll('.grid .item');
+          ids.forEach(id => {
+            const url = base + encodeURIComponent(id);
+            makeQR(grid, url, id);
+          });
 
-  for (const item of items) {
-    const name = item.querySelector('.motor').textContent;
-    const qrel = item.querySelector('div:nth-child(2)');
-    const img = qrel.querySelector('img');
-    const canvas = qrel.querySelector('canvas');
-    const dataUrl = img?.src || (canvas ? canvas.toDataURL('image/png') : null);
-    if (!dataUrl) continue;
-    const base64 = dataUrl.split(',')[1];
-    zip.file(`${name.replace(/[^a-zA-Z0-9_-]/g,'_')}.png`, base64, {base64:true});
-  }
-  const blob = await zip.generateAsync({type:'blob'});
-  saveAs(blob, 'QRCodes_SERVOS.zip');
-}
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = resolve;
-    s.onerror = reject;
-    document.body.appendChild(s);
-  });
-}
-
-async function main() {
-  const sheetIdInput = document.getElementById('sheetId');
-  const sheetNameInput = document.getElementById('sheetName');
-  const baseUrlInput  = document.getElementById('baseUrl');
-  const btnLoad = document.getElementById('btnLoad');
-  const btnZip = document.getElementById('btnDownloadAll');
-  const status = document.getElementById('status');
-  const grid = document.getElementById('grid');
-
-  btnLoad.addEventListener('click', async (e) => {
-    e.preventDefault();
-    status.className = 'loading';
-    status.textContent = 'Carregando dados da planilha...';
-
-    try {
-      const sheetId = sheetIdInput.value.trim();
-      const sheetName = sheetNameInput.value.trim();
-      const base = baseUrlInput.value.trim();
-
-      const ids = await fetchMotorIds(sheetId, sheetName);
-      if (!ids.length) throw new Error('Nenhum ID encontrado na coluna A.');
-
-      grid.innerHTML = '';
-      grid.style.display = 'grid';
-      status.style.display = 'none';
-
-      // Para cada ID, gera o QR (texto = URL completa)
-      ids.forEach(id => {
-        const url = base + encodeURIComponent(id);
-        const item = document.createElement('div');
-        item.className = 'item';
-        // Gera QR do link final
-        makeQR(item, url);
-        grid.appendChild(item);
+        } catch (err) {
+          status.className = 'error';
+          status.textContent = 'Erro: ' + err.message;
+          console.error(err);
+        }
       });
 
-    } catch (err) {
-      status.className = 'error';
-      status.textContent = 'Erro: ' + err.message;
-      console.error(err);
+      btnZip.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try { await generateZIPAll(); }
+        catch (err) { alert('Falha ao gerar ZIP: ' + err.message); }
+      });
     }
-  });
 
-  btnZip.addEventListener('click', async (e) => {
-    e.preventDefault();
-    try {
-      await generateZIPAll();
-    } catch (err) {
-      alert('Falha ao gerar ZIP: ' + err.message);
-    }
-  });
-}
-
-document.addEventListener('DOMContentLoaded', main);
-</script>
+    document.addEventListener('DOMContentLoaded', main);
+  </script>
 </body>
 </html>
