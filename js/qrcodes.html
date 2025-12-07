@@ -1,4 +1,4 @@
-
+<!-- 2) Desenvolvido por Liniker Venturini da Silva -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -6,7 +6,7 @@
   <title>Gerar QRCodes – SERVOS</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- Biblioteca de QRCode (deve carregar ANTES do script principal) -->
+  <!-- 1) CARREGAR a lib QRCode ANTES do script principal -->
   https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js</script>
 
   <style>
@@ -47,16 +47,20 @@
       <input id="baseUrl" type="text" value="https://dashboardtissue.com.br/ar.html?motor=" />
     </div>
 
+    <!-- 2) Botões com IDs corretos (fora de qualquer <script>) -->
     <div class="bar">
       #Ler planilha e gerar QRs</a>
-      <a id="btnDownloadAll" class="btn" href="#" style="backgroundanilha deve estar pública (link compartilhável ou “Publicar na Web”) para o GViz retornar dados.</p>
+      #Baixar todos (ZIP)</a>
     </div>
+
+    <p class="small">A planilha deve estar pública (link compartilhável ou “Publicar na Web”) para o GViz retornar dados.</p>
+  </div>
 
   <div id="status" class="loading">Aguardando...</div>
   <div id="grid" class="grid" style="display:none;"></div>
   <div id="debug"></div>
 
-  <!-- Script principal: NÃO incluir HTML aqui dentro -->
+  <!-- 3) Script principal (NÃO contém HTML dentro) -->
   <script>
     function logDebug(msg) {
       console.log(msg);
@@ -68,9 +72,11 @@
       const tq = "select A where A is not null";
       const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?sheet=${encodeURIComponent(sheetName)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
       logDebug('[GViz] ' + url);
+
       const res = await fetch(url);
       const txt = await res.text();
 
+      // Remove o wrapper do GViz para obter JSON puro
       const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}') + 1);
       const obj = JSON.parse(jsonStr);
 
@@ -79,6 +85,7 @@
         .map(r => (r.c && r.c[0] && r.c[0].v != null) ? String(r.c[0].v).trim() : null)
         .filter(v => v && v.length > 0);
 
+      // Dedup
       const seen = new Set(); const unique = [];
       for (const id of ids) { if (!seen.has(id)) { seen.add(id); unique.push(id); } }
       return unique;
@@ -148,7 +155,7 @@
       const grid    = document.getElementById('grid');
 
       if (!btnLoad || !btnZip) {
-        logDebug('IDs dos botões não encontrados. Verifique <a id="btnLoad"> e <a id="btnDownloadAll">.');
+        logDebug('IDs dos botões não encontrados. Verifique <a id="btnLoad"> e <a id="btnDownloadAll"> no HTML.');
         return;
       }
 
