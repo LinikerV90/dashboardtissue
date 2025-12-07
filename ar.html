@@ -3,217 +3,183 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AR Motores – Dashboard Tissue</title>
+  <title>AR Motores – Suzano</title>
 
-  <!-- A-Frame + MindAR (usar versões estáveis via jsDelivr) -->
+  <!-- A-Frame + AR.js (profissional, estável e industrial) -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.min.js"></script>
 
-  <!-- Gauges (canvas-gauges) -->
+  <!-- Gauges -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
 
   <style>
-    body { margin:0; overflow:hidden; font-family: Inter, Arial, sans-serif; background:#000; }
-    .arjs-loader {
-      height: 100%; width: 100%; position: absolute; top: 0; left: 0;
-      background: rgba(0,0,0,0.85); z-index: 9999;
-      display:flex; justify-content:center; align-items:center; color:#fff;
-      font-size:18px;
-    }
-    /* canvases usados como texturas — escondidos da UI */
-    canvas { display:none; }
-    /* mensagem de erro simples */
-    .error { position: absolute; left: 10px; top: 10px; z-index:10001; color:#fff; background:rgba(0,0,0,0.6); padding:8px; border-radius:6px; display:none;}
+    body { margin:0; overflow:hidden; background:#000; font-family: Arial; }
+    canvas { display:none; } /* canvases escondidos, usados só como textura */
   </style>
 </head>
+
 <body>
 
-  <div class="arjs-loader" id="loader">Carregando AR... aguarde</div>
-  <div class="error" id="errbox"></div>
+<!-- Canvases dos gauges -->
+<canvas id="gTorque" width="512" height="512"></canvas>
+<canvas id="gCorrente" width="512" height="512"></canvas>
+<canvas id="gTemperatura" width="512" height="512"></canvas>
 
-  <!-- Canvases para os gauges (serão usados como textures em A-Frame) -->
-  <canvas id="gTorque" width="512" height="512"></canvas>
-  <canvas id="gCorrente" width="512" height="512"></canvas>
-  <canvas id="gTemperatura" width="512" height="512"></canvas>
+<a-scene 
+  vr-mode-ui="enabled: false"
+  embedded
+  arjs="trackingMethod: barcode; barcodeType: aruco; debugUIEnabled: false;"
+>
+  <!-- CAMERA -->
+  <a-entity camera></a-entity>
 
-  <!-- Cena AR -->
-  <a-scene
-    mindar-image="imageTargetSrc: assets/targets.mind;"
-    color-space="sRGB"
-    renderer="colorManagement: true, physicallyCorrectLights: true"
-    vr-mode-ui="enabled: false"
-    device-orientation-permission-ui="enabled: true"
-    embedded
-  >
-    <a-camera position="0 0 0"></a-camera>
-  </a-scene>
+  <!-- MARCADOR ARUCO – valor 0 (substitua conforme motor) -->
+  <a-marker type="barcode" value="0" id="arucoMarker">
+
+      <!-- Título do motor -->
+      <a-text id="titulo"
+              value="Carregando..."
+              position="0 1 0"
+              align="center"
+              color="#00AEEF"
+              width="2">
+      </a-text>
+
+      <!-- Painel Torque -->
+      <a-plane position="-0.7 0.25 0"
+               width="0.9" height="0.9"
+               material="src: #gTorque; transparent: true">
+      </a-plane>
+
+      <!-- Painel Corrente -->
+      <a-plane position="0.7 0.25 0"
+               width="0.9" height="0.9"
+               material="src: #gCorrente; transparent: true">
+      </a-plane>
+
+      <!-- Painel Temperatura -->
+      <a-plane position="0 -0.6 0"
+               width="1.4" height="0.9"
+               material="src: #gTemperatura; transparent: true">
+      </a-plane>
+
+  </a-marker>
+
+</a-scene>
 
 <script>
-(async function(){
-  // ======= CONFIG =======
-  const SHEET_ID   = '1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k'; // substitua
-  const SHEET_NAME = 'SERVOS'; // substitua
-  const TARGET_FILE = 'assets/targets.mind'; // caminho relativo onde você hospedou o targets.mind
+/* ===================
+   1. CONFIGURAÇÕES
+   =================== */
+const SHEET_ID   = "1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k";
+const SHEET_NAME = "SERVOS";
 
-  // Mapear motorId -> índice do target do arquivo targets.mind (0-based)
-  const TARGET_INDEX_MAP = {
-    'MOTOR_01': 0,
-    'MOTOR_02': 1,
-    'MOTOR_03': 2,
-    // ...
+// Motor → número do marcador ArUco
+const ARUCO_MAP = {
+  "MOTOR_01": 0,
+  "MOTOR_02": 1,
+  "MOTOR_03": 2
+};
+
+/* ===================
+   2. PARÂMETROS DA URL
+   =================== */
+function getParam(p){
+  return new URLSearchParams(location.search).get(p);
+}
+
+const ID = getParam("motor");
+
+/* ===================
+   3. GAUGES
+   =================== */
+function createGauges(){
+  return {
+    t: new RadialGauge({
+      renderTo:"gTorque", width:512, height:512,
+      minValue:0, maxValue:100, units:"Torque (Nm)",
+      value:0, majorTicks:["0","20","40","60","80","100"]
+    }).draw(),
+
+    c: new RadialGauge({
+      renderTo:"gCorrente", width:512, height:512,
+      minValue:0, maxValue:100, units:"Corrente (A)",
+      value:0
+    }).draw(),
+
+    temp: new RadialGauge({
+      renderTo:"gTemperatura", width:512, height:512,
+      minValue:0, maxValue:120, units:"Temperatura (°C)",
+      value:0
+    }).draw()
   };
+}
 
-  // ======= UTIL =======
-  function showError(msg){
-    const e = document.getElementById('errbox');
-    e.style.display = 'block';
-    e.textContent = msg;
-    console.error(msg);
+const gauges = createGauges();
+
+/* ===================
+   4. BUSCAR DADOS DE UM MOTOR
+   =================== */
+async function fetchMotor(id){
+  const tq = `select A,B,C,D where A='${id}' limit 1`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
+
+  const txt = await fetch(url).then(r => r.text());
+  const json = JSON.parse(txt.substring(txt.indexOf("{"), txt.lastIndexOf("}")+1));
+  const row = json.table.rows[0].c;
+
+  return {
+    nome: row[0].v,
+    torque: row[1].v,
+    corrente: row[2].v,
+    temperatura: row[3].v
+  };
+}
+
+/* ===================
+   5. INICIALIZAÇÃO
+   =================== */
+async function init(){
+  if(!ID){
+    alert("Erro: use ?motor=MOTOR_01");
+    return;
   }
 
-  function getParam(name){
-    return new URLSearchParams(location.search).get(name) || '';
+  const markerId = ARUCO_MAP[ID];
+  if(markerId === undefined){
+    alert("Erro: motor não mapeado para marcador ArUco.");
+    return;
   }
 
-  // Busca uma linha na planilha via endpoint gviz/tq (sheet precisa ser pública)
-  async function fetchSheetRow(motorId){
-    const tq = `select A,B,C,D where A='${motorId}' limit 1`;
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('Erro ao buscar planilha: ' + res.status);
-    const txt = await res.text();
-    const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}') + 1);
-    const obj = JSON.parse(jsonStr);
-    const row = (obj.table.rows && obj.table.rows[0]) ? obj.table.rows[0].c : null;
-    if(!row) throw new Error('Motor não encontrado na planilha.');
-    return {
-      nome:        row[0]?.v || motorId,
-      torque:      Number(row[1]?.v) || 0,
-      corrente:    Number(row[2]?.v) || 0,
-      temperatura: Number(row[3]?.v) || 0
-    };
-  }
+  // define em qual marcador o A-Frame vai renderizar
+  document.getElementById("arucoMarker").setAttribute("value", markerId);
 
-  // ======= GAUGES & TEXTURE =======
-  function createGauges(){
-    const torqueGauge = new RadialGauge({
-      renderTo: 'gTorque', width:512, height:512, units:'Torque (Nm)',
-      minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], minorTicks:4,
-      borders:true, value:0, highlights:[{from:0,to:60,color:'#30B32D'},{from:60,to:85,color:'#FFDD00'},{from:85,to:100,color:'#F03E3E'}]
-    }).draw();
+  // carregar dados iniciais
+  const d = await fetchMotor(ID);
 
-    const correnteGauge = new RadialGauge({
-      renderTo: 'gCorrente', width:512, height:512, units:'Corrente (A)',
-      minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], minorTicks:4,
-      borders:true, value:0, highlights:[{from:0,to:60,color:'#30B32D'},{from:60,to:85,color:'#FFDD00'},{from:85,to:100,color:'#F03E3E'}]
-    }).draw();
+  document.getElementById("titulo").setAttribute("value", d.nome);
 
-    const temperaturaGauge = new RadialGauge({
-      renderTo: 'gTemperatura', width:512, height:512, units:'°C',
-      minValue:0, maxValue:120, majorTicks:['0','20','40','60','80','100','120'], minorTicks:4,
-      borders:true, value:0, highlights:[{from:0,to:70,color:'#30B32D'},{from:70,to:90,color:'#FFDD00'},{from:90,to:120,color:'#F03E3E'}]
-    }).draw();
+  gauges.t.value = d.torque;
+  gauges.t.draw();
+  gauges.c.value = d.corrente;
+  gauges.c.draw();
+  gauges.temp.value = d.temperatura;
+  gauges.temp.draw();
 
-    return { torqueGauge, correnteGauge, temperaturaGauge };
-  }
+  // atualizações contínuas
+  setInterval(async () => {
+    const d = await fetchMotor(ID);
+    gauges.t.value = d.torque;
+    gauges.c.value = d.corrente;
+    gauges.temp.value = d.temperatura;
 
-  function updateGauges(gauges, data){
-    gauges.torqueGauge.value = data.torque;
-    gauges.correnteGauge.value = data.corrente;
-    gauges.temperaturaGauge.value = data.temperatura;
-    // draw atualiza o canvas
-    gauges.torqueGauge.draw();
-    gauges.correnteGauge.draw();
-    gauges.temperaturaGauge.draw();
-  }
+    gauges.t.draw();
+    gauges.c.draw();
+    gauges.temp.draw();
+  }, 8000);
+}
 
-  // Converte os canvases para texturas A-Frame (simples: A-Frame usa o canvas por id)
-  // Vamos construir uma anchor quando o target for detectado.
-
-  // Cria a âncora (anchor) no scene para o targetIndex
-  function buildAnchor(targetIndex, motorNome){
-    const scene = document.querySelector('a-scene');
-    // Removemos anchors anteriores (se houver)
-    const existing = scene.querySelectorAll('[data-ar-anchor]');
-    existing.forEach(n => n.parentNode && n.parentNode.removeChild(n));
-
-    const anchor = document.createElement('a-entity');
-    anchor.setAttribute('mindar-image-target', `targetIndex: ${targetIndex}`);
-    anchor.setAttribute('data-ar-anchor', 'true');
-
-    // texto com o nome do motor
-    const title = document.createElement('a-text');
-    title.setAttribute('value', motorNome);
-    title.setAttribute('color', '#0051A2');
-    title.setAttribute('align', 'center');
-    title.setAttribute('position', '0 0.9 0');
-    title.setAttribute('scale','1.2 1.2 1');
-
-    // Planos usando os canvases como src
-    const planeTorque = document.createElement('a-plane');
-    planeTorque.setAttribute('position','-0.6 0.25 0');
-    planeTorque.setAttribute('width','0.7');
-    planeTorque.setAttribute('height','0.7');
-    planeTorque.setAttribute('material','src: #gTorque; transparent: true');
-
-    const planeCorr = document.createElement('a-plane');
-    planeCorr.setAttribute('position','0.6 0.25 0');
-    planeCorr.setAttribute('width','0.7');
-    planeCorr.setAttribute('height','0.7');
-    planeCorr.setAttribute('material','src: #gCorrente; transparent: true');
-
-    const planeTemp = document.createElement('a-plane');
-    planeTemp.setAttribute('position','0 -0.4 0');
-    planeTemp.setAttribute('width','1.0');
-    planeTemp.setAttribute('height','0.7');
-    planeTemp.setAttribute('material','src: #gTemperatura; transparent: true');
-
-    anchor.appendChild(title);
-    anchor.appendChild(planeTorque);
-    anchor.appendChild(planeCorr);
-    anchor.appendChild(planeTemp);
-    scene.appendChild(anchor);
-  }
-
-  // ======= INICIALIZAÇÃO =======
-  try {
-    const motorId = getParam('motor');
-    if(!motorId) throw new Error('Parâmetro ?motor= ausente na URL.');
-
-    const targetIndex = TARGET_INDEX_MAP[motorId];
-    if(targetIndex === undefined) throw new Error('Motor não mapeado para targetIndex.');
-
-    // Cria gauges
-    const gauges = createGauges();
-
-    // Faz um teste de permissões / inicialização do MindAR (espera a cena A-Frame estar pronta)
-    // A-Frame inicializa automaticamente. Usamos um pequeno delay para aguardar sistema de câmera.
-    await new Promise(r => setTimeout(r, 300)); // breve pausa
-
-    // obtenha dados iniciais da planilha
-    const data = await fetchSheetRow(motorId);
-    updateGauges(gauges, data);
-    buildAnchor(targetIndex, data.nome);
-
-    // esconde loader
-    document.getElementById('loader').style.display = 'none';
-
-    // Atualizações periódicas (ajuste de acordo com necessidade)
-    setInterval(async () => {
-      try {
-        const d = await fetchSheetRow(motorId);
-        updateGauges(gauges, d);
-      } catch(e){
-        console.warn('Atualização falhou:', e);
-      }
-    }, 10000);
-
-  } catch (err) {
-    showError('Erro: ' + err.message);
-    document.getElementById('loader').style.display = 'none';
-  }
-})();
+init();
 </script>
 
 </body>
