@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -6,31 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AR Motores – Dashboard Tissue</title>
 
-  <!-- A-Frame + MindAR (WebAR image tracking) -->
-  https://aframe.io/releases/1.4.2/aframe.min.js</script>
-  https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.1.0/dist/mindar-image.prod.js</script>
-  https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.1.0/dist/mindar-image-aframe.prod.js</script>
+  <!-- A-Frame + MindAR (usar versões estáveis via jsDelivr) -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
-  <!-- Gauges em Canvas -->
-  https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js</script>
+  <!-- Gauges (canvas-gauges) -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
 
   <style>
-    body { margin:0; overflow:hidden; font-family: Inter, Arial, sans-serif; }
+    body { margin:0; overflow:hidden; font-family: Inter, Arial, sans-serif; background:#000; }
     .arjs-loader {
       height: 100%; width: 100%; position: absolute; top: 0; left: 0;
       background: rgba(0,0,0,0.85); z-index: 9999;
       display:flex; justify-content:center; align-items:center; color:#fff;
+      font-size:18px;
     }
-    /* Tamanhos dos canvases (texturas dos gauges) */
-    canvas { display:none; } /* escondidos na UI; usados como textura */
+    /* canvases usados como texturas — escondidos da UI */
+    canvas { display:none; }
+    /* mensagem de erro simples */
+    .error { position: absolute; left: 10px; top: 10px; z-index:10001; color:#fff; background:rgba(0,0,0,0.6); padding:8px; border-radius:6px; display:none;}
   </style>
 </head>
 <body>
 
-  <!-- Loader enquanto carrega targets.mind -->
-  <div class="arjs-loader"><div>Carregando AR... aguarde</div></div>
+  <div class="arjs-loader" id="loader">Carregando AR... aguarde</div>
+  <div class="error" id="errbox"></div>
 
-  <!-- Canvases para os gauges (texturas) -->
+  <!-- Canvases para os gauges (serão usados como textures em A-Frame) -->
   <canvas id="gTorque" width="512" height="512"></canvas>
   <canvas id="gCorrente" width="512" height="512"></canvas>
   <canvas id="gTemperatura" width="512" height="512"></canvas>
@@ -44,26 +46,17 @@
     device-orientation-permission-ui="enabled: true"
     embedded
   >
-    <a-assets>
-      <!-- Registra os canvases como assets para usar como textura -->
-      <canvas id="texTorque" width="512" height="512"></canvas>
-      <canvas id="texCorrente" width="512" height="512"></canvas>
-      <canvas id="texTemperatura" width="512" height="512"></canvas>
-    </a-assets>
-
-    <!-- Âncora dinâmica: será criada via JS com o targetIndex do motor -->
-    <!-- Dentro dela vamos inserir 3 planos com as texturas + o nome do motor -->
-
     <a-camera position="0 0 0"></a-camera>
   </a-scene>
 
 <script>
-(function(){
+(async function(){
   // ======= CONFIG =======
-  const SHEET_ID   = '1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k';      // ID da planilha
-  const SHEET_NAME = 'SERVOS';        // Nome da aba (ex.: 'Motores')
-  // Mapeamento motor -> índice do alvo no targets.mind (0 a N-1)
-  // Preencha conforme a ordem que você compilou os QRs:
+  const SHEET_ID   = '1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k'; // substitua
+  const SHEET_NAME = 'SERVOS'; // substitua
+  const TARGET_FILE = 'assets/targets.mind'; // caminho relativo onde você hospedou o targets.mind
+
+  // Mapear motorId -> índice do target do arquivo targets.mind (0-based)
   const TARGET_INDEX_MAP = {
     'MOTOR_01': 0,
     'MOTOR_02': 1,
@@ -72,22 +65,28 @@
   };
 
   // ======= UTIL =======
+  function showError(msg){
+    const e = document.getElementById('errbox');
+    e.style.display = 'block';
+    e.textContent = msg;
+    console.error(msg);
+  }
+
   function getParam(name){
     return new URLSearchParams(location.search).get(name) || '';
   }
 
-  // Parseia o retorno GViz (remove prefixo/sufixo e vira JSON)
-  // Técnica comum para endpoint /gviz/tq com out:json. [8](https://basescripts.com/wp-content/uploads/2021/08/Google-Sheet-Data-as-JSON-Guide.pdf)
+  // Busca uma linha na planilha via endpoint gviz/tq (sheet precisa ser pública)
   async function fetchSheetRow(motorId){
     const tq = `select A,B,C,D where A='${motorId}' limit 1`;
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
     const res = await fetch(url);
+    if(!res.ok) throw new Error('Erro ao buscar planilha: ' + res.status);
     const txt = await res.text();
     const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}') + 1);
     const obj = JSON.parse(jsonStr);
     const row = (obj.table.rows && obj.table.rows[0]) ? obj.table.rows[0].c : null;
     if(!row) throw new Error('Motor não encontrado na planilha.');
-    // A: nome, B: torque, C: corrente, D: temperatura
     return {
       nome:        row[0]?.v || motorId,
       torque:      Number(row[1]?.v) || 0,
@@ -96,150 +95,124 @@
     };
   }
 
-  // Cria gauges em cada canvas
+  // ======= GAUGES & TEXTURE =======
   function createGauges(){
     const torqueGauge = new RadialGauge({
-      renderTo: 'gTorque',
-      width: 512, height: 512,
-      units: 'Torque (Nm)',
-      minValue: 0, maxValue: 100, // ajuste o range
-      majorTicks: ['0','20','40','60','80','100'],
-      minorTicks: 4,
-      borders: true,
-      value: 0,
-      highlights: [
-        { from: 0,  to: 60, color: '#30B32D' },
-        { from: 60, to: 85, color: '#FFDD00' },
-        { from: 85, to: 100, color: '#F03E3E' },
-      ]
+      renderTo: 'gTorque', width:512, height:512, units:'Torque (Nm)',
+      minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], minorTicks:4,
+      borders:true, value:0, highlights:[{from:0,to:60,color:'#30B32D'},{from:60,to:85,color:'#FFDD00'},{from:85,to:100,color:'#F03E3E'}]
     }).draw();
 
     const correnteGauge = new RadialGauge({
-      renderTo: 'gCorrente',
-      width: 512, height: 512,
-      units: 'Corrente (A)',
-      minValue: 0, maxValue: 100, // ajuste o range
-      majorTicks: ['0','20','40','60','80','100'],
-      minorTicks: 4,
-      borders: true,
-      value: 0,
-      highlights: [
-        { from: 0,  to: 60, color: '#30B32D' },
-        { from: 60, to: 85, color: '#FFDD00' },
-        { from: 85, to: 100, color: '#F03E3E' },
-      ]
+      renderTo: 'gCorrente', width:512, height:512, units:'Corrente (A)',
+      minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], minorTicks:4,
+      borders:true, value:0, highlights:[{from:0,to:60,color:'#30B32D'},{from:60,to:85,color:'#FFDD00'},{from:85,to:100,color:'#F03E3E'}]
     }).draw();
 
     const temperaturaGauge = new RadialGauge({
-      renderTo: 'gTemperatura',
-      width: 512, height: 512,
-      units: 'Temperatura (°C)',
-      minValue: 0, maxValue: 120, // ajuste o range
-      majorTicks: ['0','20','40','60','80','100','120'],
-      minorTicks: 4,
-      borders: true,
-      value: 0,
-      highlights: [
-        { from: 0,   to: 70,  color: '#30B32D' },
-        { from: 70,  to: 90,  color: '#FFDD00' },
-        { from: 90,  to: 120, color: '#F03E3E' },
-      ]
+      renderTo: 'gTemperatura', width:512, height:512, units:'°C',
+      minValue:0, maxValue:120, majorTicks:['0','20','40','60','80','100','120'], minorTicks:4,
+      borders:true, value:0, highlights:[{from:0,to:70,color:'#30B32D'},{from:70,to:90,color:'#FFDD00'},{from:90,to:120,color:'#F03E3E'}]
     }).draw();
 
     return { torqueGauge, correnteGauge, temperaturaGauge };
   }
 
-  // Atualiza valores dos gauges
   function updateGauges(gauges, data){
-    gauges.torqueGauge.value      = data.torque;
-    gauges.correnteGauge.value    = data.corrente;
+    gauges.torqueGauge.value = data.torque;
+    gauges.correnteGauge.value = data.corrente;
     gauges.temperaturaGauge.value = data.temperatura;
+    // draw atualiza o canvas
     gauges.torqueGauge.draw();
     gauges.correnteGauge.draw();
     gauges.temperaturaGauge.draw();
   }
 
-  // Copia conteúdo dos canvases para assets (se quiser separar)
-  function mirrorCanvasesToAssets(){
-    ['gTorque','gCorrente','gTemperatura'].forEach((id, i) => {
-      const src = document.getElementById(id);
-      const dst = document.getElementById(['texTorque','texCorrente','texTemperatura'][i]);
-      const ctx = dst.getContext('2d');
-      ctx.clearRect(0,0,dst.width,dst.height);
-      ctx.drawImage(src, 0, 0);
-    });
-  }
+  // Converte os canvases para texturas A-Frame (simples: A-Frame usa o canvas por id)
+  // Vamos construir uma anchor quando o target for detectado.
 
-  // Cria a âncora e insere os planos/texto
+  // Cria a âncora (anchor) no scene para o targetIndex
   function buildAnchor(targetIndex, motorNome){
     const scene = document.querySelector('a-scene');
+    // Removemos anchors anteriores (se houver)
+    const existing = scene.querySelectorAll('[data-ar-anchor]');
+    existing.forEach(n => n.parentNode && n.parentNode.removeChild(n));
+
     const anchor = document.createElement('a-entity');
     anchor.setAttribute('mindar-image-target', `targetIndex: ${targetIndex}`);
+    anchor.setAttribute('data-ar-anchor', 'true');
 
-    // Planos com as texturas (ajuste posição/escala conforme sua preferência)
-    const planeTorque = document.createElement('a-plane');
-    planeTorque.setAttribute('position', '-0.6 0.3 0');
-    planeTorque.setAttribute('width', '0.7');
-    planeTorque.setAttribute('height', '0.7');
-    planeTorque.setAttribute('material', 'src: #texTorque; transparent: true');
-
-    const planeCorrente = document.createElement('a-plane');
-    planeCorrente.setAttribute('position', '0.6 0.3 0');
-    planeCorrente.setAttribute('width', '0.7');
-    planeCorrente.setAttribute('height', '0.7');
-    planeCorrente.setAttribute('material', 'src: #texCorrente; transparent: true');
-
-    const planeTemperatura = document.createElement('a-plane');
-    planeTemperatura.setAttribute('position', '0  -0.4 0');
-    planeTemperatura.setAttribute('width', '0.7');
-    planeTemperatura.setAttribute('height', '0.7');
-    planeTemperatura.setAttribute('material', 'src: #texTemperatura; transparent: true');
-
+    // texto com o nome do motor
     const title = document.createElement('a-text');
     title.setAttribute('value', motorNome);
     title.setAttribute('color', '#0051A2');
     title.setAttribute('align', 'center');
-    title.setAttribute('position', '0 0.85 0');
-    title.setAttribute('scale', '1.4 1.4 1');
+    title.setAttribute('position', '0 0.9 0');
+    title.setAttribute('scale','1.2 1.2 1');
+
+    // Planos usando os canvases como src
+    const planeTorque = document.createElement('a-plane');
+    planeTorque.setAttribute('position','-0.6 0.25 0');
+    planeTorque.setAttribute('width','0.7');
+    planeTorque.setAttribute('height','0.7');
+    planeTorque.setAttribute('material','src: #gTorque; transparent: true');
+
+    const planeCorr = document.createElement('a-plane');
+    planeCorr.setAttribute('position','0.6 0.25 0');
+    planeCorr.setAttribute('width','0.7');
+    planeCorr.setAttribute('height','0.7');
+    planeCorr.setAttribute('material','src: #gCorrente; transparent: true');
+
+    const planeTemp = document.createElement('a-plane');
+    planeTemp.setAttribute('position','0 -0.4 0');
+    planeTemp.setAttribute('width','1.0');
+    planeTemp.setAttribute('height','0.7');
+    planeTemp.setAttribute('material','src: #gTemperatura; transparent: true');
 
     anchor.appendChild(title);
     anchor.appendChild(planeTorque);
-    anchor.appendChild(planeCorrente);
-    anchor.appendChild(planeTemperatura);
-
+    anchor.appendChild(planeCorr);
+    anchor.appendChild(planeTemp);
     scene.appendChild(anchor);
   }
 
   // ======= INICIALIZAÇÃO =======
-  document.addEventListener('DOMContentLoaded', async () => {
-    try {
-      const motorId = getParam('motor');
-      if(!motorId) throw new Error('Parâmetro ?motor= ausente na URL.');
-      const targetIndex = TARGET_INDEX_MAP[motorId];
-      if(targetIndex === undefined) throw new Error('Motor não mapeado para targetIndex.');
+  try {
+    const motorId = getParam('motor');
+    if(!motorId) throw new Error('Parâmetro ?motor= ausente na URL.');
 
-      const gauges = createGauges();
+    const targetIndex = TARGET_INDEX_MAP[motorId];
+    if(targetIndex === undefined) throw new Error('Motor não mapeado para targetIndex.');
 
-      const data = await fetchSheetRow(motorId);
-      updateGauges(gauges, data);
-      mirrorCanvasesToAssets();
-      buildAnchor(targetIndex, data.nome);
+    // Cria gauges
+    const gauges = createGauges();
 
-      // Oculta loader
-      document.querySelector('.arjs-loader').style.display = 'none';
+    // Faz um teste de permissões / inicialização do MindAR (espera a cena A-Frame estar pronta)
+    // A-Frame inicializa automaticamente. Usamos um pequeno delay para aguardar sistema de câmera.
+    await new Promise(r => setTimeout(r, 300)); // breve pausa
 
-      // Atualizações periódicas (ex.: a cada 10 s)
-      setInterval(async () => {
+    // obtenha dados iniciais da planilha
+    const data = await fetchSheetRow(motorId);
+    updateGauges(gauges, data);
+    buildAnchor(targetIndex, data.nome);
+
+    // esconde loader
+    document.getElementById('loader').style.display = 'none';
+
+    // Atualizações periódicas (ajuste de acordo com necessidade)
+    setInterval(async () => {
+      try {
         const d = await fetchSheetRow(motorId);
         updateGauges(gauges, d);
-        mirrorCanvasesToAssets();
-      }, 10000);
+      } catch(e){
+        console.warn('Atualização falhou:', e);
+      }
+    }, 10000);
 
-    } catch (err) {
-      alert('Erro: ' + err.message);
-      console.error(err);
-    }
-  });
+  } catch (err) {
+    showError('Erro: ' + err.message);
+    document.getElementById('loader').style.display = 'none';
+  }
 })();
 </script>
 
