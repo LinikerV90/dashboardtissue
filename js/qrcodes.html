@@ -3,33 +3,33 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Gerar QRCodes dos Motores – SERVOS</title>
+  <title>Gerar QRCodes – SERVOS</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- QRCode LIB: PRECISA vir antes do seu script principal -->
-  <script/cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js</script>
+  <!-- Biblioteca de QRCode (deve carregar ANTES do script principal) -->
+  https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js</script>
 
   <style>
-    :root { --azul-suzano: #0051A2; --cinza: #f2f4f7; }
-    body { font-family: Inter, Arial, sans-serif; margin: 24px; background: var(--cinza); }
-    h1 { margin: 0 0 8px; color: var(--azul-suzano); }
-    .desc { margin: 0 0 16px; color: #333; }
+    :root { --azul-suzano:#0051A2; --cinza:#f2f4f7; }
+    body { font-family: Inter, Arial, sans-serif; margin:24px; background:var(--cinza); }
+    h1 { margin:0 0 8px; color:var(--azul-suzano); }
+    .desc { margin:0 0 16px; color:#333; }
     .config { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin-bottom:16px; }
-    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:16px; }
-    .item { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; text-align:center; }
-    .motor { font-weight:600; margin-bottom:8px; color:#111; }
+    .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+    input[type=text]{ width:420px; max-width:100%; padding:8px 10px; border:1px solid #cfd6de; border-radius:8px; }
     .btn { margin-top:8px; display:inline-block; padding:8px 12px; background:var(--azul-suzano); color:#fff; border-radius:8px; text-decoration:none; }
-    .meta { margin-top:20px; font-size:12px; color:#666; }
+    .small { font-size:12px; color:#555; }
     .loading { padding:12px 16px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; display:inline-block; }
     .error { padding:12px 16px; background:#ffeceb; border:1px solid #f5c2c0; border-radius:12px; color:#7a1d18; }
-    .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
-    input[type=text] { width: 420px; max-width: 100%; padding:8px 10px; border:1px solid #cfd6de; border-radius:8px; }
-    .small { font-size:12px; color:#555; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; }
+    .item { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; text-align:center; }
+    .motor { font-weight:600; margin-bottom:8px; color:#111; }
+    #debug { margin-top:16px; font-size:12px; color:#7a1d18; white-space:pre-wrap; }
   </style>
 </head>
 <body>
   <h1>Gerar QRCodes – Aba “SERVOS”</h1>
-  <p class="desc">Este utilitário lê os IDs dos motores na coluna <strong>A</strong> da planilha e cria QRs que apontam para <code>https://dashboardtissue.com.br/ar.html?motor=ID</code>.</p>
+  <p class="desc">Lê a coluna <strong>A</strong> e cria QRs para <code>https://dashboardtissue.com.br/ar.html?motor=ID</code>.</p>
 
   <div class="config">
     <div class="bar">
@@ -47,35 +47,38 @@
       <input id="baseUrl" type="text" value="https://dashboardtissue.com.br/ar.html?motor=" />
     </div>
 
-    <!-- Botões com IDs -> exigidos pelo JS -->
     <div class="bar">
       #Ler planilha e gerar QRs</a>
-      <a id="btnDownloadAlla>
-    </div>
-
-    <p class="small">
-      Obs.: é necessário que a planilha esteja com “Qualquer pessoa com o link pode visualizar” ou
-      <em>Publish to the Web</em> para leitura pública pelo navegador.
-    </p>
+      <a id="btnDownloadAll" class="btn" href="#" style="backgroundanilha deve estar pública (link compartilhável ou “Publicar na Web”) para o GViz retornar dados.</p>
   </div>
 
   <div id="status" class="loading">Aguardando...</div>
   <div id="grid" class="grid" style="display:none;"></div>
-  <p class="meta">Dica: após gerar, clique em <em>Baixar PNG</em> para salvar cada QR. Você pode imprimir e afixar nos motores.</p>
+  <div id="debug"></div>
 
-  <!-- Seu script PRINCIPAL (vem DEPOIS dos elementos do DOM) -->
+  <!-- Script principal: NÃO incluir HTML aqui dentro -->
   <script>
+    function logDebug(msg) {
+      console.log(msg);
+      const d = document.getElementById('debug');
+      d.textContent += (typeof msg === 'string' ? msg : JSON.stringify(msg)) + '\n';
+    }
+
     async function fetchMotorIds(sheetId, sheetName) {
       const tq = "select A where A is not null";
       const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?sheet=${encodeURIComponent(sheetName)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
+      logDebug('[GViz] ' + url);
       const res = await fetch(url);
       const txt = await res.text();
+
       const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}') + 1);
       const obj = JSON.parse(jsonStr);
+
       const rows = obj?.table?.rows || [];
       const ids = rows
         .map(r => (r.c && r.c[0] && r.c[0].v != null) ? String(r.c[0].v).trim() : null)
         .filter(v => v && v.length > 0);
+
       const seen = new Set(); const unique = [];
       for (const id of ids) { if (!seen.has(id)) { seen.add(id); unique.push(id); } }
       return unique;
@@ -91,7 +94,7 @@
       wrap.appendChild(title);
 
       const qrel = document.createElement('div');
-      new QRCode(qrel, { text, width: 256, height: 256, correctLevel: QRCode.CorrectLevel.H });
+      new QRCode(qrel, { text, width:256, height:256, correctLevel: QRCode.CorrectLevel.H });
       wrap.appendChild(qrel);
 
       const a = document.createElement('a');
@@ -144,6 +147,11 @@
       const status  = document.getElementById('status');
       const grid    = document.getElementById('grid');
 
+      if (!btnLoad || !btnZip) {
+        logDebug('IDs dos botões não encontrados. Verifique <a id="btnLoad"> e <a id="btnDownloadAll">.');
+        return;
+      }
+
       btnLoad.addEventListener('click', async (e) => {
         e.preventDefault();
         status.className = 'loading';
@@ -152,7 +160,9 @@
           const sheetId = sheetIdInput.value.trim();
           const sheetName = sheetNameInput.value.trim();
           const base = baseUrlInput.value.trim();
+
           const ids = await fetchMotorIds(sheetId, sheetName);
+          logDebug('[IDs] ' + JSON.stringify(ids));
           if (!ids.length) throw new Error('Nenhum ID encontrado na coluna A.');
 
           grid.innerHTML = '';
@@ -167,7 +177,7 @@
         } catch (err) {
           status.className = 'error';
           status.textContent = 'Erro: ' + err.message;
-          console.error(err);
+          logDebug(err);
         }
       });
 
