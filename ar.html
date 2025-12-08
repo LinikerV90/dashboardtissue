@@ -158,6 +158,13 @@
         // força atualização da textura a cada ciclo
         for (let i = 0; i < planes.length; i++) {
           const plane = document.getElementById(planes[i]);
+          plane.setAttribute('material', {
+            src: `#${canvases[i]}`,
+            transparent: true
+          });
+          plane.setAttribute('visible', 'true');
+          plane.setAttribute('rotation','0 0 0'); // ajuste conforme necessário
+        
           const mesh = plane.getObject3D('mesh');
           if (mesh && mesh.material.map) {
             mesh.material.map.needsUpdate = true;
