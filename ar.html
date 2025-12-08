@@ -14,7 +14,8 @@
 
   <style>
     body { margin:0; overflow:hidden; background:#000; font-family: Arial; }
-    canvas { visibility:hidden; position:absolute; left:-9999px; } /* canvases escondidos, usados só como textura */
+    /* canvases escondidos, mas não com display:none */
+    canvas { visibility:hidden; position:absolute; left:-9999px; }
     .error { position:absolute; top:10px; left:10px; z-index:1000; color:#fff; background:rgba(0,0,0,0.5); padding:8px; border-radius:5px; display:none;}
     a-scene {
       width: 100vw;
@@ -138,6 +139,7 @@
       plane.setAttribute('material', `src: #${canvases[i]}; transparent: true;`);
       plane.setAttribute('visible', 'true');
       plane.setAttribute('rotation','0 0 0'); // ajuste conforme necessário
+
       const mesh = plane.getObject3D('mesh');
       if (mesh && mesh.material.map) {
         mesh.material.map.needsUpdate = true;
@@ -158,13 +160,6 @@
         // força atualização da textura a cada ciclo
         for (let i = 0; i < planes.length; i++) {
           const plane = document.getElementById(planes[i]);
-          plane.setAttribute('material', {
-            src: `#${canvases[i]}`,
-            transparent: true
-          });
-          plane.setAttribute('visible', 'true');
-          plane.setAttribute('rotation','0 0 0'); // ajuste conforme necessário
-        
           const mesh = plane.getObject3D('mesh');
           if (mesh && mesh.material.map) {
             mesh.material.map.needsUpdate = true;
