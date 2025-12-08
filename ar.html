@@ -16,6 +16,14 @@
     body { margin:0; overflow:hidden; background:#000; font-family: Arial; }
     canvas { display:none; } /* canvases escondidos, usados só como textura */
     .error { position:absolute; top:10px; left:10px; z-index:1000; color:#fff; background:rgba(0,0,0,0.5); padding:8px; border-radius:5px; display:none;}
+    a-scene {
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      overflow: hidden;
+    }
   </style>
 </head>
 
@@ -33,7 +41,6 @@
   color-space="sRGB"
   vr-mode-ui="enabled: false"
   device-orientation-permission-ui="enabled: true"
-  embedded
 >
   <!-- Camera -->
   <a-camera position="0 0 0"></a-camera>
