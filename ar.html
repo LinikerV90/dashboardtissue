@@ -89,7 +89,7 @@
 
   async function fetchMotor(id){
     try {
-      const tq = `select A,B,C,D where B='${id}' limit 1`;
+      const tq = `select A,B,C,D where A='${id}' limit 1`;
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
       const txt = await fetch(url).then(r => r.text());
       const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}')+1);
@@ -97,10 +97,10 @@
       const row = (obj.table.rows && obj.table.rows[0]) ? obj.table.rows[0].c : null;
       if(!row) throw new Error('Motor não encontrado na planilha.');
       return {
-        nome: row[0]?.v || id,
-        torque: Number(row[1]?.v) || 0,
-        corrente: Number(row[2]?.v) || 0,
-        temperatura: Number(row[3]?.v) || 0
+        nome: row[0].v,
+        torque: row[1].v,
+        corrente: row[2].v,
+        temperatura: row[3].v
       };
     } catch(e){
       showError(e.message);
