@@ -14,9 +14,16 @@
 
   <style>
     body { margin:0; overflow:hidden; background:#000; font-family: Arial; }
-    canvas { display:none; }
+    canvas { display:none; } /* canvases escondidos, usados só como textura */
     .error { position:absolute; top:10px; left:10px; z-index:1000; color:#fff; background:rgba(0,0,0,0.5); padding:8px; border-radius:5px; display:none;}
-    a-scene { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; overflow: hidden; }
+    a-scene {
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      overflow: hidden;
+    }
   </style>
 </head>
 
@@ -38,17 +45,24 @@
   <a-camera position="0 0 0"></a-camera>
 
   <a-entity mindar-image-target="targetIndex: 0" id="anchor">
-      <a-text id="titulo" value="Carregando..." position="0 0.9 0" align="center" color="#00AEEF" width="2"></a-text>
+      <a-text id="titulo"
+              value="Carregando..."
+              position="0 1 0"
+              align="center"
+              color="#00AEEF"
+              width="2">
+      </a-text>
 
-      <!-- Planos para os gauges -->
-      <a-plane id="planeTorque" position="-0.7 0.3 0" width="0.6" height="0.6" visible="false"></a-plane>
-      <a-plane id="planeCorrente" position="0 0.3 0" width="0.6" height="0.6" visible="false"></a-plane>
-      <a-plane id="planeTemp" position="0.7 0.3 0" width="0.6" height="0.6" visible="false"></a-plane>
+      <!-- Painéis dos gauges -->
+      <a-plane id="planeTorque" position="-0.7 0.25 0.01" width="0.9" height="0.9" material="transparent:true"></a-plane>
+      <a-plane id="planeCorrente" position="0.7 0.25 0.01" width="0.9" height="0.9" material="transparent:true"></a-plane>
+      <a-plane id="planeTemp" position="0 -0.6 0.01" width="1.4" height="0.9" material="transparent:true"></a-plane>
   </a-entity>
 </a-scene>
 
 <script>
 (async function(){
+  const API_URL = "https://script.google.com/macros/s/AKfycbw_1jVhRGzErkeQgBSu4JQTbh_24150E5DB8jP84VfTKEd08ESrhtlWPgau0KeWnKVj/exec";
   const errbox = document.getElementById('errbox');
   function showError(msg){
     errbox.style.display = 'block';
@@ -62,11 +76,10 @@
 
   async function fetchMotor(id){
     try {
-      const url = `https://script.google.com/macros/s/AKfycbw_1jVhRGzErkeQgBSu4JQTbh_24150E5DB8jP84VfTKEd08ESrhtlWPgau0KeWnKVj/exec?id=${encodeURIComponent(id)}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if(!data || !data.id) throw new Error('Motor não encontrado na planilha.');
-      return data;
+      const res = await fetch(`${API_URL}?id=${id}`);
+      const json = await res.json();
+      if(!json || !json.id) throw new Error(`Motor "${id}" não encontrado.`);
+      return json;
     } catch(e){
       showError(e.message);
       throw e;
@@ -96,62 +109,56 @@
   }
 
   const gauges = createGauges();
+  const motorId = getParam('motor');
+  if(!motorId) return showError('Parâmetro ?motor= ausente na URL.');
 
-  try {
-    const motorId = getParam('motor');
-    if(!motorId) throw new Error('Parâmetro ?motor= ausente na URL.');
+  let data;
+  try { data = await fetchMotor(motorId); } catch(e){ return; }
 
-    const data = await fetchMotor(motorId);
+  const anchor = document.getElementById('anchor');
+  const planes = ['planeTorque','planeCorrente','planeTemp'];
+  const canvases = ['gTorque','gCorrente','gTemperatura'];
 
-    const anchor = document.querySelector("#anchor");
+  anchor.addEventListener("targetFound", () => {
+    console.log("Imagem detectada! Mostrando gauges.");
 
-    anchor.addEventListener("targetFound", () => {
-      console.log("Imagem detectada! Mostrando gauges.");
+    document.getElementById('titulo').setAttribute('value', data.id);
 
-      // Atualiza título
-      document.getElementById('titulo').setAttribute('value', data.id);
+    // Atualiza valores e desenha
+    gauges.torqueGauge.value = data.torque;
+    gauges.correnteGauge.value = data.corrente;
+    gauges.temperaturaGauge.value = data.temperatura;
+    gauges.torqueGauge.draw();
+    gauges.correnteGauge.draw();
+    gauges.temperaturaGauge.draw();
 
-      // Atualiza gauges
-      gauges.torqueGauge.value = data.torque;
-      gauges.correnteGauge.value = data.corrente;
-      gauges.temperaturaGauge.value = data.temperatura;
-      gauges.torqueGauge.draw();
-      gauges.correnteGauge.draw();
-      gauges.temperaturaGauge.draw();
+    // Aplica os canvases aos planos e garante visibilidade
+    for(let i=0;i<planes.length;i++){
+      const plane = document.getElementById(planes[i]);
+      plane.setAttribute('material', `src: #${canvases[i]}; transparent:true`);
+      plane.setAttribute('visible', 'true');
+      plane.setAttribute('rotation','-90 0 0');
+    }
 
-      // Vincula os canvases aos planos e mostra-os
-      const planes = ['planeTorque','planeCorrente','planeTemp'];
-      const canvases = ['gTorque','gCorrente','gTemperatura'];
-      for(let i=0;i<planes.length;i++){
-        const plane = document.getElementById(planes[i]);
-        plane.setAttribute('material', `src: #${canvases[i]}; transparent: true`);
-        plane.setAttribute('visible', 'true');
-      }
+    // Atualizações contínuas
+    if(!anchor.updateInterval){
+      anchor.updateInterval = setInterval(async () => {
+        const d = await fetchMotor(motorId);
+        gauges.torqueGauge.value = d.torque;
+        gauges.correnteGauge.value = d.corrente;
+        gauges.temperaturaGauge.value = d.temperatura;
+        gauges.torqueGauge.draw();
+        gauges.correnteGauge.draw();
+        gauges.temperaturaGauge.draw();
+      }, 8000);
+    }
+  });
 
-      // Atualizações contínuas
-      if(!anchor.updateInterval){
-        anchor.updateInterval = setInterval(async () => {
-          const d = await fetchMotor(motorId);
-          gauges.torqueGauge.value = d.torque;
-          gauges.correnteGauge.value = d.corrente;
-          gauges.temperaturaGauge.value = d.temperatura;
-          gauges.torqueGauge.draw();
-          gauges.correnteGauge.draw();
-          gauges.temperaturaGauge.draw();
-        }, 8000);
-      }
-    });
+  anchor.addEventListener("targetLost", () => {
+    console.log("Imagem perdida. Escondendo gauges.");
+    planes.forEach(p => document.getElementById(p).setAttribute('visible','false'));
+  });
 
-    anchor.addEventListener("targetLost", () => {
-      console.log("Imagem perdida. Escondendo gauges.");
-      ['planeTorque','planeCorrente','planeTemp'].forEach(id => {
-        document.getElementById(id).setAttribute('visible','false');
-      });
-    });
-
-  } catch(err){
-    showError(err.message);
-  }
 })();
 </script>
 
