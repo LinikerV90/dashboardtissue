@@ -6,9 +6,9 @@
 
     <title>Motor AR Dashboard</title>
 
-    <!-- A-Frame + MindAR -->
-    <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.0/dist/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
+    <!-- ORDEM CORRETA - OBRIGATÓRIA -->
+    <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.7/dist/mindar-image-aframe.prod.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; background: black; }
@@ -16,177 +16,171 @@
 </head>
 
 <body>
-    <script>
-        // ======= PEGAR MOTOR DA URL ========
-        const urlParams = new URLSearchParams(window.location.search);
-        const motorID = urlParams.get("motor") || "N/A";
 
-        // Debug
-        console.log("Motor selecionado:", motorID);
+<script>
+    // ===== PEGAR MOTOR DA URL =====
+    const urlParams = new URLSearchParams(window.location.search);
+    const motorID = urlParams.get("motor") || "N/A";
+    console.log("Motor selecionado:", motorID);
 
-        // ==========================
-        // FUNÇÃO DE BUSCAR DADOS
-        // ==========================
-        async function carregarDados() {
-            try {
-                const req = await fetch(
-                    "https://script.google.com/macros/s/AKfycbzWXgOsZwGooFNxmK6uFCkGoT_1fJ_g5sF99HLZMG0dkypXgxoxj5y_oqsmJK0k61diqg/exec?motor=" + motorID
-                );
+    // ======= FUNÇÃO PARA BUSCAR DADOS DO MOTOR =========
+    async function carregarDados() {
+        try {
+            const req = await fetch(
+                "https://script.google.com/macros/s/AKfycbzWXgOsZwGooFNxmK6uFCkGoT_1fJ_g5sF99HLZMG0dkypXgxoxj5y_oqsmJK0k61diqg/exec?motor=" + motorID
+            );
 
-                const json = await req.json();
-                console.log("JSON recebido:", json);
+            const json = await req.json();
+            console.log("JSON recebido:", json);
 
-                if (!json || !json.id) return;
+            if (!json || !json.id) return;
 
-                // Atualiza título
-                document.querySelector("#titulo-motor").setAttribute("value", json.id);
+            // Atualiza título do motor
+            document.querySelector("#titulo-motor").setAttribute("value", json.id);
 
-                atualizarGauge(json.torque, 100, "#ring-torque", "#valor-torque");
-                atualizarGauge(json.corrente, 20, "#ring-corrente", "#valor-corrente");
-                atualizarGauge(json.temperatura, 120, "#ring-temp", "#valor-temp");
+            atualizarGauge(json.torque, 100, "#ring-torque", "#valor-torque");
+            atualizarGauge(json.corrente, 20, "#ring-corrente", "#valor-corrente");
+            atualizarGauge(json.temperatura, 120, "#ring-temp", "#valor-temp");
 
-            } catch (e) {
-                console.error("ERRO ao carregar dados:", e);
-            }
+        } catch (e) {
+            console.error("ERRO ao carregar dados:", e);
         }
+    }
 
-        // ============ FUNÇÃO DE ATUALIZAÇÃO DO GAUGE ============
-        function atualizarGauge(valor, max, idRing, idText) {
-            const percent = Math.min(Math.max(valor / max, 0), 1);
-            const angulo = percent * 270;
+    // ====== FUNÇÃO DE ATUALIZAÇÃO DO GAUGE ======
+    function atualizarGauge(valor, max, idRing, idText) {
+        const percent = Math.min(Math.max(valor / max, 0), 1);
+        const angulo = percent * 270;  // gauge circular parcial
 
-            document.querySelector(idRing).setAttribute("theta-length", angulo);
-            document.querySelector(idText).setAttribute("value", valor);
-        }
-    </script>
+        document.querySelector(idRing).setAttribute("theta-length", angulo);
+        document.querySelector(idText).setAttribute("value", valor);
+    }
+</script>
 
-    <!-- ====================================== -->
-    <!--           INITIALIZAÇÃO AR              -->
-    <!-- ====================================== -->
-    <a-scene mindar-image="imageTargetSrc: ./asset/targets.mind;" 
-             vr-mode-ui="enabled: false"
-             device-orientation-permission-ui="enabled: true">
+<!-- ========================= AR SCENE ============================ -->
+<a-scene mindar-image="imageTargetSrc: ./asset/targets.mind;"
+         vr-mode-ui="enabled: false"
+         device-orientation-permission-ui="enabled: true">
 
-        <!-- Câmera -->
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <a-assets>
+        <img id="logo-suzano" src="./asset/suzano.png">
+    </a-assets>
 
-        <!-- ====================================== -->
-        <!--            TARGET (MARCADOR)            -->
-        <!-- ====================================== -->
-        <a-entity mindar-image-target="targetIndex: 0" id="marker">
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-            <!-- ID do Motor -->
-            <a-text id="titulo-motor"
-                    value="Carregando..."
-                    color="#FFFFFF"
-                    width="2"
+    <!-- ======================= TARGET ======================== -->
+    <a-entity mindar-image-target="targetIndex: 0" id="marker">
+
+        <!-- TÍTULO / ID DO MOTOR -->
+        <a-text id="titulo-motor"
+                value="Carregando..."
+                color="#FFFFFF"
+                width="2"
+                align="center"
+                position="0 1.1 0.01"
+                font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
+        </a-text>
+
+        <!-- ============ GAUGE TORQUE =============== -->
+        <a-entity position="-1 0.1 0">
+            <a-circle radius="0.55" color="#222"></a-circle>
+
+            <a-ring id="ring-torque"
+                    radius-inner="0.38"
+                    radius-outer="0.52"
+                    color="#7CFC88"
+                    theta-start="0"
+                    theta-length="0">
+            </a-ring>
+
+            <a-text id="valor-torque"
+                    value="0"
                     align="center"
-                    position="0 1.1 0.01"
+                    width="1.5"
+                    color="#7CFC88"
+                    position="0 0 0.01"
                     font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
             </a-text>
 
-
-            <!-- ================== GAUGE TORQUE ================== -->
-            <a-entity position="-1 0.1 0">
-                <a-circle radius="0.55" color="#222"></a-circle>
-
-                <a-ring id="ring-torque"
-                        radius-inner="0.38"
-                        radius-outer="0.52"
-                        color="#7CFC88"
-                        theta-start="0"
-                        theta-length="0">
-                </a-ring>
-
-                <a-text id="valor-torque" 
-                        value="0"
-                        align="center"
-                        width="1.5"
-                        color="#7CFC88"
-                        position="0 0 0.01"
-                        font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-                </a-text>
-
-                <a-text value="TORQUE"
-                        align="center"
-                        width="1.5"
-                        color="#ccc"
-                        position="0 -0.45 0.01"
-                        font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-                </a-text>
-            </a-entity>
-
-            <!-- ================== GAUGE CORRENTE ================== -->
-            <a-entity position="0 0.1 0">
-                <a-circle radius="0.55" color="#222"></a-circle>
-
-                <a-ring id="ring-corrente"
-                        radius-inner="0.38"
-                        radius-outer="0.52"
-                        color="#78C2FF"
-                        theta-start="0"
-                        theta-length="0">
-                </a-ring>
-
-                <a-text id="valor-corrente" 
-                        value="0"
-                        align="center"
-                        width="1.5"
-                        color="#78C2FF"
-                        position="0 0 0.01"
-                        font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-                </a-text>
-
-                <a-text value="CORRENTE"
-                        align="center"
-                        width="1.5"
-                        color="#ccc"
-                        position="0 -0.45 0.01"
-                        font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-                </a-text>
-            </a-entity>
-
-            <!-- ================== GAUGE TEMPERATURA ================== -->
-            <a-entity position="1 0.1 0">
-                <a-circle radius="0.55" color="#222"></a-circle>
-
-                <a-ring id="ring-temp"
-                        radius-inner="0.38"
-                        radius-outer="0.52"
-                        color="#FF6A6A"
-                        theta-start="0"
-                        theta-length="0">
-                </a-ring>
-
-                <a-text id="valor-temp" 
-                        value="0"
-                        align="center"
-                        width="1.5"
-                        color="#FF6A6A"
-                        position="0 0 0.01"
-                        font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-                </a-text>
-
-                <a-text value="TEMPERATURA"
-                        align="center"
-                        width="1.5"
-                        color="#ccc"
-                        position="0 -0.45 0.01"
-                        font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-                </a-text>
-            </a-entity>
-
-
+            <a-text value="TORQUE"
+                    align="center"
+                    width="1.5"
+                    color="#ccc"
+                    position="0 -0.45 0.01"
+                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
+            </a-text>
         </a-entity>
-    </a-scene>
 
-    <script>
-        // Chama API sempre que o marker for encontrado
-        document.querySelector("#marker").addEventListener("targetFound", () => {
-            console.log("Imagem detectada! Atualizando gauges...");
-            carregarDados();
-        });
-    </script>
+        <!-- ============ GAUGE CORRENTE =============== -->
+        <a-entity position="0 0.1 0">
+            <a-circle radius="0.55" color="#222"></a-circle>
+
+            <a-ring id="ring-corrente"
+                    radius-inner="0.38"
+                    radius-outer="0.52"
+                    color="#78C2FF"
+                    theta-start="0"
+                    theta-length="0">
+            </a-ring>
+
+            <a-text id="valor-corrente"
+                    value="0"
+                    align="center"
+                    width="1.5"
+                    color="#78C2FF"
+                    position="0 0 0.01"
+                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
+            </a-text>
+
+            <a-text value="CORRENTE"
+                    align="center"
+                    width="1.5"
+                    color="#ccc"
+                    position="0 -0.45 0.01"
+                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
+            </a-text>
+        </a-entity>
+
+        <!-- ============ GAUGE TEMPERATURA =============== -->
+        <a-entity position="1 0.1 0">
+            <a-circle radius="0.55" color="#222"></a-circle>
+
+            <a-ring id="ring-temp"
+                    radius-inner="0.38"
+                    radius-outer="0.52"
+                    color="#FF6A6A"
+                    theta-start="0"
+                    theta-length="0">
+            </a-ring>
+
+            <a-text id="valor-temp"
+                    value="0"
+                    align="center"
+                    width="1.5"
+                    color="#FF6A6A"
+                    position="0 0 0.01"
+                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
+            </a-text>
+
+            <a-text value="TEMPERATURA"
+                    align="center"
+                    width="1.5"
+                    color="#ccc"
+                    position="0 -0.45 0.01"
+                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
+            </a-text>
+        </a-entity>
+
+    </a-entity>
+</a-scene>
+
+<script>
+    // Chamar API somente quando a imagem for detectada
+    document.querySelector("#marker").addEventListener("targetFound", () => {
+        console.log("Imagem detectada! Atualizando dados...");
+        carregarDados();
+    });
+</script>
 
 </body>
 </html>
