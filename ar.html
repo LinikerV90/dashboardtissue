@@ -54,9 +54,9 @@
       </a-text>
 
       <!-- Painéis dos gauges -->
-      <a-plane id="planeTorque" position="-0.7 0.25 0.01" width="0.9" height="0.9" material="transparent:true"></a-plane>
-      <a-plane id="planeCorrente" position="0.7 0.25 0.01" width="0.9" height="0.9" material="transparent:true"></a-plane>
-      <a-plane id="planeTemp" position="0 -0.6 0.01" width="1.4" height="0.9" material="transparent:true"></a-plane>
+      <a-plane id="planeTorque" position="-0.7 0.25 0.01" width="0.9" height="0.9"></a-plane>
+      <a-plane id="planeCorrente" position="0.7 0.25 0.01" width="0.9" height="0.9"></a-plane>
+      <a-plane id="planeTemp" position="0 -0.6 0.01" width="1.4" height="0.9"></a-plane>
   </a-entity>
 </a-scene>
 
@@ -137,7 +137,7 @@
       const plane = document.getElementById(planes[i]);
       plane.setAttribute('material', `src: #${canvases[i]}; transparent: true;`);
       plane.setAttribute('visible', 'true');
-      plane.setAttribute('rotation','0 0 0'); // teste sem rotação
+      plane.setAttribute('rotation','0 0 0'); // ajuste conforme necessário
       const mesh = plane.getObject3D('mesh');
       if (mesh && mesh.material.map) {
         mesh.material.map.needsUpdate = true;
@@ -154,6 +154,15 @@
         gauges.torqueGauge.draw();
         gauges.correnteGauge.draw();
         gauges.temperaturaGauge.draw();
+
+        // força atualização da textura a cada ciclo
+        for (let i = 0; i < planes.length; i++) {
+          const plane = document.getElementById(planes[i]);
+          const mesh = plane.getObject3D('mesh');
+          if (mesh && mesh.material.map) {
+            mesh.material.map.needsUpdate = true;
+          }
+        }
       }, 8000);
     }
   });
@@ -161,6 +170,7 @@
   anchor.addEventListener("targetLost", () => {
     console.log("Imagem perdida. Escondendo gauges.");
     planes.forEach(p => document.getElementById(p).setAttribute('visible','false'));
+    document.getElementById('titulo').setAttribute('value', 'Aponte para o marcador...');
   });
 
 })();
