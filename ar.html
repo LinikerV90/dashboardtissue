@@ -1,128 +1,142 @@
  <!-- Desenvolvido por Liniker Venturini da Silva -->
-<!DOCTYPE html>
-<html lang="pt-br">
+ <!DOCTYPE html>
+<html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<title>AR Motores</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Motores – Suzano</title>
 
-<style>
-  body {
-    margin: 0;
-    overflow: hidden;
-    background: #000;
-  }
-  #video {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    object-fit: cover;   /* 🔥 EVITA A FAIXA E PREENCHE A TELA */
-  }
-  #canvas {
-    display: none;       /* Canvas fica oculto, apenas processa a imagem */
-  }
-  #info {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.75);
-    color: #fff;
-    padding: 12px 18px;
-    font-size: 18px;
-    border-radius: 10px;
-    min-width: 250px;
-    text-align: center;
-  }
-</style>
+  <!-- Gauges -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/js-aruco@1.3.0/build/aruco.js"></script>
+  <!-- js-aruco2 -->
+  <script src="https://cdn.jsdelivr.net/npm/js-aruco2@2.0.0/src/aruco.min.js"></script>
 
+  <style>
+    body, html { margin:0; padding:0; overflow:hidden; background:#000; }
+    video, canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
+    canvas#gaugesCanvas { display:none; }
+    .label { position:absolute; color:#00AEEF; font-size:20px; text-align:center; width:100%; top:10px; }
+  </style>
 </head>
 <body>
 
-<video id="video" autoplay playsinline></video>
-<canvas id="canvas"></canvas>
-<div id="info">Aproxime um marcador ArUco…</div>
+<div class="label" id="motorName">Carregando...</div>
+
+<!-- Video da câmera -->
+<video id="video" autoplay muted playsinline></video>
+
+<!-- Canvas para processar o vídeo (não visível) -->
+<canvas id="videoCanvas"></canvas>
+
+<!-- Canvas dos gauges -->
+<canvas id="gTorque" width="512" height="512"></canvas>
+<canvas id="gCorrente" width="512" height="512"></canvas>
+<canvas id="gTemperatura" width="512" height="512"></canvas>
 
 <script>
+(async function(){
+  // ===========================
+  // 1. CONFIGURAÇÃO
+  // ===========================
+  const SHEET_ID = "1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k";
+  const SHEET_NAME = "SERVOS";
 
-// ===============================================================
-// 1) Ativar Câmera
-// ===============================================================
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const context = canvas.getContext("2d");
-const detector = new AR.Detector();
+  // Map ArUco ID → motorId (coluna NOME)
+  const ARUCO_MAP = {}; // preenchido dinamicamente via fetch da planilha
 
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-  .then(stream => video.srcObject = stream)
-  .catch(err => alert("Erro ao acessar câmera: " + err));
+  // ===========================
+  // 2. GAUGES
+  // ===========================
+  function createGauges(){
+    return {
+      torque: new RadialGauge({
+        renderTo:"gTorque", width:512, height:512, units:"Torque (Nm)",
+        minValue:0, maxValue:100, value:0, majorTicks:["0","20","40","60","80","100"]
+      }).draw(),
+      corrente: new RadialGauge({
+        renderTo:"gCorrente", width:512, height:512, units:"Corrente (A)",
+        minValue:0, maxValue:100, value:0, majorTicks:["0","20","40","60","80","100"]
+      }).draw(),
+      temperatura: new RadialGauge({
+        renderTo:"gTemperatura", width:512, height:512, units:"°C",
+        minValue:0, maxValue:120, value:0, majorTicks:["0","20","40","60","80","100","120"]
+      }).draw()
+    };
+  }
 
+  const gauges = createGauges();
 
-// ===============================================================
-// 2) Função para buscar dados do Google Apps Script
-// ===============================================================
-async function buscarMotorDoID(id) {
-    try {
-        const url = "https://script.google.com/macros/s/AKfycby85k95-t5Vz5n3lhZ1_OWzJi3btzohsJhI38C071U/exec?id=MOTOR_" + id;
-        const resp = await fetch(url);
-        return await resp.json();
-    } catch (e) {
-        return { erro: "Falha ao consultar GAS" };
+  // ===========================
+  // 3. FUNÇÃO PARA BUSCAR DADOS
+  // ===========================
+  async function fetchMotors(){
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
+    const txt = await fetch(url).then(r => r.text());
+    const jsonStr = txt.substring(txt.indexOf("{"), txt.lastIndexOf("}")+1);
+    const obj = JSON.parse(jsonStr);
+    const rows = obj.table.rows;
+    const motors = {};
+    rows.forEach(r => {
+      const c = r.c;
+      if(c[0]) ARUCO_MAP[c[0].v] = { nome: c[1].v, torque: c[2].v, corrente: c[3].v, temperatura: c[4].v };
+    });
+    return motors;
+  }
+
+  await fetchMotors();
+
+  // ===========================
+  // 4. CONFIGURAÇÃO DA CÂMERA
+  // ===========================
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('videoCanvas');
+  const context = canvas.getContext('2d');
+
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+  video.srcObject = stream;
+
+  await new Promise(r => video.onloadedmetadata = r);
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  // Detector ArUco
+  const detector = new AR.Detector();
+
+  // ===========================
+  // 5. LOOP PRINCIPAL
+  // ===========================
+  function tick(){
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = context.getImageData(0,0,canvas.width,canvas.height);
+    const markers = detector.detect(imageData);
+
+    if(markers.length > 0){
+      // pega primeiro marcador detectado
+      const id = markers[0].id;
+      const motor = ARUCO_MAP[id];
+      if(motor){
+        document.getElementById("motorName").textContent = motor.nome;
+        gauges.torque.value = motor.torque; gauges.torque.draw();
+        gauges.corrente.value = motor.corrente; gauges.corrente.draw();
+        gauges.temperatura.value = motor.temperatura; gauges.temperatura.draw();
+      }
     }
-}
 
+    requestAnimationFrame(tick);
+  }
 
-// ===============================================================
-// 3) Loop de detecção ArUco
-// ===============================================================
-let ultimoID = null;
-let cooldown = false;
+  tick();
 
-function detectar() {
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        // Ajusta canvas ao tamanho do vídeo
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+  // ===========================
+  // 6. ATUALIZAÇÃO PERIÓDICA
+  // ===========================
+  setInterval(async () => {
+    await fetchMotors();
+  }, 10000);
 
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const imagem = context.getImageData(0, 0, canvas.width, canvas.height);
-        const markers = detector.detect(imagem);
-
-        if (markers.length > 0) {
-            const id = markers[0].id;
-
-            if (!cooldown || id !== ultimoID) {
-                ultimoID = id;
-                cooldown = true;
-
-                buscarMotorDoID(id).then(dados => {
-                    if (dados.erro) {
-                        info.innerText = "Erro ao buscar dados do motor";
-                    } else {
-                        info.innerHTML = `
-                            <b>Motor: MOTOR_${id}</b><br>
-                            Torque: ${dados.torque}<br>
-                            Corrente: ${dados.corrente}<br>
-                            Temperatura: ${dados.temperatura}°C
-                        `;
-                    }
-                });
-
-                // Evita leitura repetida a cada frame
-                setTimeout(() => cooldown = false, 2000);
-            }
-        }
-    }
-
-    requestAnimationFrame(detectar);
-}
-
-detectar();
+})();
 </script>
 
 </body>
