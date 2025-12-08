@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>AR Dashboard</title>
 
-  <!-- A-FRAME + MINDAR -->
+  <!-- A-FRAME + MINDAR (VERSÃO CORRETA) -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
 
@@ -16,7 +16,6 @@
       font-family: Arial;
     }
 
-    /* a câmera fica sempre em tela cheia */
     a-scene {
       width: 100vw !important;
       height: 100vh !important;
@@ -26,7 +25,6 @@
       overflow: hidden;
     }
 
-    /* mensagem de erro */
     .error {
       position: absolute;
       top: 10px;
@@ -52,43 +50,23 @@
   vr-mode-ui="enabled: false"
   device-orientation-permission-ui="enabled: false">
 
-  <!-- Câmera AR -->
   <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-  <!-- ANCHOR DO MARCADOR -->
   <a-entity mindar-image-target="targetIndex: 0" id="anchor">
 
-    <!-- GAUGE TORQUE -->
     <a-entity id="gaugeTorque" position="0 0.6 0" visible="false">
       <a-cylinder height="0.05" radius="0.5" color="#0044ff"></a-cylinder>
-      <a-text id="torqueLabel"
-              value="Torque: 0"
-              position="-0.4 0.1 0.1"
-              color="#fff"
-              width="2">
-      </a-text>
+      <a-text id="torqueLabel" value="Torque: 0" position="-0.4 0.1 0.1" color="#fff" width="2"></a-text>
     </a-entity>
 
-    <!-- GAUGE CORRENTE -->
     <a-entity id="gaugeCorrente" position="0 0 0" visible="false">
       <a-cylinder height="0.05" radius="0.5" color="#00ff44"></a-cylinder>
-      <a-text id="correnteLabel"
-              value="Corrente: 0"
-              position="-0.4 0.1 0.1"
-              color="#fff"
-              width="2">
-      </a-text>
+      <a-text id="correnteLabel" value="Corrente: 0" position="-0.4 0.1 0.1" color="#fff" width="2"></a-text>
     </a-entity>
 
-    <!-- GAUGE TEMPERATURA -->
     <a-entity id="gaugeTemp" position="0 -0.6 0" visible="false">
       <a-cylinder height="0.05" radius="0.5" color="#ff4400"></a-cylinder>
-      <a-text id="tempLabel"
-              value="Temperatura: 0"
-              position="-0.4 0.1 0.1"
-              color="#fff"
-              width="2">
-      </a-text>
+      <a-text id="tempLabel" value="Temp: 0" position="-0.4 0.1 0.1" color="#fff" width="2"></a-text>
     </a-entity>
 
   </a-entity>
@@ -96,31 +74,26 @@
 </a-scene>
 
 <script>
-  /** UTIL: Mostrar erro elegante **/
   function showError(msg) {
     const box = document.getElementById("errorBox");
     box.innerText = msg;
     box.style.display = "block";
   }
 
-  /** PEGAR ID DO MOTOR VIA ?motor=MTR001 **/
   const urlParams = new URLSearchParams(window.location.search);
   const motorId = urlParams.get("motor");
 
-  if (!motorId) {
-    showError("Nenhum ID de motor informado. Use ?motor=MTR001");
-  }
+  if (!motorId) showError("Nenhum ID de motor informado. Use ?motor=MTR001");
 
   console.log("Motor selecionado:", motorId);
 
-  /** Carregar dados do Apps Script **/
   async function loadMotorData() {
     try {
-      const response = await fetch(
+      const res = await fetch(
         `https://script.google.com/macros/s/AKfycbw_1jVhRGzErkeQgBSu4JQTbh_24150E5DB8jP84VfTKEd08ESrhtlWPgau0KeWnKVj/exec?id=${motorId}`
       );
 
-      const data = await response.json();
+      const data = await res.json();
       console.log("JSON recebido:", data);
 
       if (!data.id) {
@@ -128,25 +101,22 @@
         return;
       }
 
-      // Atualiza texto dos gauges
       document.getElementById("torqueLabel").setAttribute("value", `Torque: ${data.torque}`);
       document.getElementById("correnteLabel").setAttribute("value", `Corrente: ${data.corrente}`);
       document.getElementById("tempLabel").setAttribute("value", `Temp: ${data.temperatura}`);
 
     } catch (err) {
       console.error(err);
-      showError("Erro ao consultar dados do motor.");
+      showError("Erro ao consultar Apps Script.");
     }
   }
 
   loadMotorData();
 
-  /** EVENTOS MINDAR **/
   const anchor = document.getElementById("anchor");
 
   anchor.addEventListener("targetFound", () => {
     console.log("Imagem detectada! Mostrando gauges.");
-
     document.getElementById("gaugeTorque").setAttribute("visible", true);
     document.getElementById("gaugeCorrente").setAttribute("visible", true);
     document.getElementById("gaugeTemp").setAttribute("visible", true);
@@ -154,7 +124,6 @@
 
   anchor.addEventListener("targetLost", () => {
     console.log("Imagem perdida. Ocultando gauges.");
-
     document.getElementById("gaugeTorque").setAttribute("visible", false);
     document.getElementById("gaugeCorrente").setAttribute("visible", false);
     document.getElementById("gaugeTemp").setAttribute("visible", false);
