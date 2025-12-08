@@ -1,11 +1,15 @@
+<!-- DESENVOLVIDO POR LINIKER VENTURINI DA SILVA
+EMAIL: LINIKERVENTURINI@LIVE.COM
+TODOS OS DIREITOS RESERVADOS @2025
+EM PARCERIA COM SUZANO S.A.-->
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
   <title>AR Dashboard</title>
 
-  <!-- A-FRAME + MINDAR (VERSÃO CORRETA) -->
-  <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+  <!-- LIBS CERTAS -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe@1.2.0/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
 
   <style>
@@ -25,24 +29,83 @@
       overflow: hidden;
     }
 
-    .error {
+    .overlayGauge {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      padding: 8px 12px;
-      background: rgba(0,0,0,0.6);
-      color: #fff;
-      border-radius: 6px;
+      width: 200px;
+      height: 200px;
       z-index: 9999;
       display: none;
     }
+
+    #gaugeTorqueCanvas { top: 60px; left: 5%; }
+    #gaugeCorrenteCanvas { top: 60px; left: 50%; transform: translateX(-50%); }
+    #gaugeTempCanvas { top: 60px; right: 5%; }
+
+    .gaugeLabel {
+      position: absolute;
+      width: 200px;
+      text-align: center;
+      color: white;
+      font-size: 20px;
+      top: 265px;
+      z-index: 9999;
+      display: none;
+      font-weight: bold;
+      text-shadow: 1px 1px 3px black;
+    }
+
+    #labelTorque { left: 5%; }
+    #labelCorrente { left: 50%; transform: translateX(-50%); }
+    #labelTemp { right: 5%; }
+
+    #motorName {
+      position: absolute;
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #00eaff;
+      font-size: 32px;
+      font-weight: bold;
+      text-shadow: 2px 2px 4px #000;
+      display: none;
+      z-index: 99999;
+    }
+
+    #errorBox {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ff4444;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      display: none;
+      font-size: 18px;
+      z-index: 999999;
+    }
   </style>
 </head>
+
 
 <body>
 
 <div class="error" id="errorBox"></div>
 
+<!-- Nome do motor -->
+<div id="motorName"></div>
+
+<!-- GAUGES -->
+<canvas id="gaugeTorqueCanvas" class="overlayGauge"></canvas>
+<div id="labelTorque" class="gaugeLabel">Torque</div>
+
+<canvas id="gaugeCorrenteCanvas" class="overlayGauge"></canvas>
+<div id="labelCorrente" class="gaugeLabel">Corrente</div>
+
+<canvas id="gaugeTempCanvas" class="overlayGauge"></canvas>
+<div id="labelTemp" class="gaugeLabel">Temperatura</div>
+
+<!-- SCENE -->
 <a-scene
   mindar-image="imageTargetSrc: ./asset/targets.mind;"
   color-space="sRGB"
@@ -52,41 +115,96 @@
 
   <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-  <a-entity mindar-image-target="targetIndex: 0" id="anchor">
-
-    <a-entity id="gaugeTorque" position="0 0.6 0" visible="false">
-      <a-cylinder height="0.05" radius="0.5" color="#0044ff"></a-cylinder>
-      <a-text id="torqueLabel" value="Torque: 0" position="-0.4 0.1 0.1" color="#fff" width="2"></a-text>
-    </a-entity>
-
-    <a-entity id="gaugeCorrente" position="0 0 0" visible="false">
-      <a-cylinder height="0.05" radius="0.5" color="#00ff44"></a-cylinder>
-      <a-text id="correnteLabel" value="Corrente: 0" position="-0.4 0.1 0.1" color="#fff" width="2"></a-text>
-    </a-entity>
-
-    <a-entity id="gaugeTemp" position="0 -0.6 0" visible="false">
-      <a-cylinder height="0.05" radius="0.5" color="#ff4400"></a-cylinder>
-      <a-text id="tempLabel" value="Temp: 0" position="-0.4 0.1 0.1" color="#fff" width="2"></a-text>
-    </a-entity>
-
-  </a-entity>
+  <a-entity mindar-image-target="targetIndex: 0" id="anchor"></a-entity>
 
 </a-scene>
 
 <script>
+
+  /* ============================================================
+        COR DINÂMICA POR PORCENTAGEM
+     ============================================================ */
+  function corPorPercent(valor, max) {
+    const pct = (valor / max) * 100;
+
+    if (pct <= 66)  return "#00ff44";   // verde
+    if (pct <= 80)  return "#ffcc00";   // amarelo
+    return "#ff0000";                   // vermelho
+  }
+
+  /* ============================================================
+        FUNÇÃO DE DESENHO DO GAUGE
+     ============================================================ */
+  function desenharGauge(canvasId, valor, min, max, unidade) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = 200;
+    canvas.height = 200;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const centerX = w / 2;
+    const centerY = h / 2;
+    const radius = w * 0.35;
+
+    const angleStart = -Math.PI * 0.5;
+    const angleEnd = angleStart + Math.PI * 2;
+
+    const rel = (valor - min) / (max - min);
+    const angleVal = angleStart + rel * (angleEnd - angleStart);
+
+    const cor = corPorPercent(valor, max);
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, angleStart, angleEnd);
+    ctx.lineWidth = radius * 0.4;
+    ctx.strokeStyle = "#333";
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, angleStart, angleVal);
+    ctx.strokeStyle = cor;
+    ctx.stroke();
+
+    ctx.font = `${w * 0.18}px Arial`;
+    ctx.fillStyle = cor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${valor} ${unidade}`, centerX, centerY + 10);
+  }
+
+
+  /* ============================================================
+        ERROR BOX
+     ============================================================ */
   function showError(msg) {
     const box = document.getElementById("errorBox");
     box.innerText = msg;
     box.style.display = "block";
   }
 
+
+  /* ============================================================
+        ID pela URL
+     ============================================================ */
   const urlParams = new URLSearchParams(window.location.search);
   const motorId = urlParams.get("motor");
 
-  if (!motorId) showError("Nenhum ID de motor informado. Use ?motor=MTR001");
+  if (!motorId)
+    showError("Nenhum ID de motor informado. Use ?motor=MTR001");
 
   console.log("Motor selecionado:", motorId);
 
+
+  let nomeMotor = "";
+
+
+  /* ============================================================
+        BUSCAR DADOS
+     ============================================================ */
   async function loadMotorData() {
     try {
       const res = await fetch(
@@ -101,9 +219,12 @@
         return;
       }
 
-      document.getElementById("torqueLabel").setAttribute("value", `Torque: ${data.torque}`);
-      document.getElementById("correnteLabel").setAttribute("value", `Corrente: ${data.corrente}`);
-      document.getElementById("tempLabel").setAttribute("value", `Temp: ${data.temperatura}`);
+      nomeMotor = data.id;
+      document.getElementById("motorName").innerText = nomeMotor;
+
+      desenharGauge("gaugeTorqueCanvas", data.torque, 0, 100, "%");
+      desenharGauge("gaugeCorrenteCanvas", data.corrente, 0, 100, "A");
+      desenharGauge("gaugeTempCanvas", data.temperatura, 0, 150, "°C");
 
     } catch (err) {
       console.error(err);
@@ -112,22 +233,52 @@
   }
 
   loadMotorData();
+  setInterval(loadMotorData, 30000);
+
+
+  /* ============================================================
+        MOSTRAR / ESCONDER
+     ============================================================ */
+  const torqueCanvas = document.getElementById("gaugeTorqueCanvas");
+  const correnteCanvas = document.getElementById("gaugeCorrenteCanvas");
+  const tempCanvas = document.getElementById("gaugeTempCanvas");
+
+  const labelTorque = document.getElementById("labelTorque");
+  const labelCorrente = document.getElementById("labelCorrente");
+  const labelTemp = document.getElementById("labelTemp");
+
+  const motorNameLabel = document.getElementById("motorName");
 
   const anchor = document.getElementById("anchor");
 
   anchor.addEventListener("targetFound", () => {
     console.log("Imagem detectada! Mostrando gauges.");
-    document.getElementById("gaugeTorque").setAttribute("visible", true);
-    document.getElementById("gaugeCorrente").setAttribute("visible", true);
-    document.getElementById("gaugeTemp").setAttribute("visible", true);
+
+    torqueCanvas.style.display = "block";
+    correnteCanvas.style.display = "block";
+    tempCanvas.style.display = "block";
+
+    labelTorque.style.display = "block";
+    labelCorrente.style.display = "block";
+    labelTemp.style.display = "block";
+
+    motorNameLabel.style.display = "block";
   });
 
   anchor.addEventListener("targetLost", () => {
     console.log("Imagem perdida. Ocultando gauges.");
-    document.getElementById("gaugeTorque").setAttribute("visible", false);
-    document.getElementById("gaugeCorrente").setAttribute("visible", false);
-    document.getElementById("gaugeTemp").setAttribute("visible", false);
+
+    torqueCanvas.style.display = "none";
+    correnteCanvas.style.display = "none";
+    tempCanvas.style.display = "none";
+
+    labelTorque.style.display = "none";
+    labelCorrente.style.display = "none";
+    labelTemp.style.display = "none";
+
+    motorNameLabel.style.display = "none";
   });
+
 </script>
 
 </body>
