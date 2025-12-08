@@ -83,7 +83,7 @@
 
   async function fetchMotor(id){
     try {
-      const tq = `select A,B,C,D where B='${id}' limit 1`;
+      const tq = `select A,B,C,D where A='${id}' limit 1`;
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
       const txt = await fetch(url).then(r => r.text());
       const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}')+1);
