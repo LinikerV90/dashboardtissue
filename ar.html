@@ -82,24 +82,24 @@
   }
 
   async function fetchMotor(id){
-    try {
-      const tq = `select A,B,C,D where A='${id}' limit 1`;
-      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
-      const txt = await fetch(url).then(r => r.text());
-      const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}')+1);
-      const obj = JSON.parse(jsonStr);
-      const row = (obj.table.rows && obj.table.rows[0]) ? obj.table.rows[0].c : null;
-      if(!row) throw new Error(`Motor "${id}" não encontrado na planilha.`);
-      return {
-        nome: row[0].v,
-        torque: row[1].v,
-        corrente: row[2].v,
-        temperatura: row[3].v
-      };
-    } catch(e){
-      showError(e.message);
-      throw e;
-    }
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&tqx=out:json`;
+    const txt = await fetch(url).then(r => r.text());
+    const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}')+1);
+    const obj = JSON.parse(jsonStr);
+    const rows = obj.table.rows;
+  
+    if(!rows || rows.length === 0) throw new Error('Planilha vazia ou não encontrada.');
+  
+    // Filtra pelo nome do motor na coluna A
+    const row = rows.find(r => r.c[0] && r.c[0].v === id);
+    if(!row) throw new Error(`Motor "${id}" não encontrado na planilha.`);
+  
+    return {
+      nome: row.c[0].v,
+      torque: row.c[1].v,
+      corrente: row.c[2].v,
+      temperatura: row.c[3].v
+    };
   }
 
   function createGauges(){
