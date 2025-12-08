@@ -14,139 +14,167 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
 
   <style>
-    body { margin:0; overflow:hidden; background:#000; font-family: Arial; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #000;
+      font-family: Arial;
+    }
+
+    a-scene {
+      position: absolute !important;
+      top: 0;
+      left: 0;
+      width: 100vw !important;
+      height: 100vh !important;
+    }
+
     canvas { display:none; }
   </style>
 </head>
 
 <body>
 
-<!-- Gauges -->
+<!-- Canvases dos gauges -->
 <canvas id="gTorque" width="512" height="512"></canvas>
 <canvas id="gCorrente" width="512" height="512"></canvas>
 <canvas id="gTemperatura" width="512" height="512"></canvas>
 
-<a-scene 
+<a-scene
+  vr-mode-ui="enabled: false"
   embedded
   arjs="trackingMethod: barcode; barcodeType: aruco; debugUIEnabled: false;"
 >
   <a-entity camera></a-entity>
 
-  <!-- UM MARCADOR "GENÉRICO": o JS muda o ID dinamicamente -->
-  <a-marker type="barcode" value="0" id="arucoMarker">
+  <!-- Marcador ArUco genérico (ID será detectado automaticamente) -->
+  <a-marker type="barcode" value="0" id="arucoMarker" aruco-listener>
 
-      <a-text id="titulo"
-              value="Aguardando marcador..."
-              position="0 1 0"
-              align="center"
-              color="#00AEEF"
-              width="2">
-      </a-text>
+    <a-text id="titulo"
+            value="Aponte para um marcador"
+            position="0 1 0"
+            align="center"
+            color="#00AEEF"
+            width="2">
+    </a-text>
 
-      <a-plane position="-0.7 0.25 0" width="0.9" height="0.9"
-               material="src: #gTorque; transparent: true"></a-plane>
+    <a-plane position="-0.7 0.25 0"
+             width="0.9" height="0.9"
+             material="src: #gTorque; transparent: true">
+    </a-plane>
 
-      <a-plane position="0.7 0.25 0" width="0.9" height="0.9"
-               material="src: #gCorrente; transparent: true"></a-plane>
+    <a-plane position="0.7 0.25 0"
+             width="0.9" height="0.9"
+             material="src: #gCorrente; transparent: true">
+    </a-plane>
 
-      <a-plane position="0 -0.6 0" width="1.4" height="0.9"
-               material="src: #gTemperatura; transparent: true"></a-plane>
+    <a-plane position="0 -0.6 0"
+             width="1.4" height="0.9"
+             material="src: #gTemperatura; transparent: true">
+    </a-plane>
 
   </a-marker>
 </a-scene>
 
 <script>
-// =============================
-// CONFIG
-// =============================
+/* ===================
+   1. CONFIGURAÇÕES
+   =================== */
 const SHEET_ID   = "1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k";
 const SHEET_NAME = "SERVOS";
 
-// =============================
-// GAUGES
-// =============================
+/* ===================
+   2. GAUGES
+   =================== */
 function createGauges(){
   return {
-    torque: new RadialGauge({
+    t: new RadialGauge({
       renderTo:"gTorque", width:512, height:512,
-      minValue:0, maxValue:100, units:"Torque (Nm)", value:0
+      minValue:0, maxValue:100, units:"Torque (Nm)",
+      value:0
     }).draw(),
-    corrente: new RadialGauge({
+
+    c: new RadialGauge({
       renderTo:"gCorrente", width:512, height:512,
-      minValue:0, maxValue:100, units:"Corrente (A)", value:0
+      minValue:0, maxValue:100, units:"Corrente (A)",
+      value:0
     }).draw(),
-    temperatura: new RadialGauge({
+
+    temp: new RadialGauge({
       renderTo:"gTemperatura", width:512, height:512,
-      minValue:0, maxValue:200, units:"Temperatura (°C)", value:0
+      minValue:0, maxValue:120, units:"Temperatura (°C)",
+      value:0
     }).draw()
   };
 }
+
 const gauges = createGauges();
 
-// =============================
-// BUSCA DINÂMICA PELO ID DO ARUCO
-// =============================
-async function fetchMotorByAruco(idAruco){
-  const query = `select A,B,C,D where A=${idAruco} limit 1`;
-  const url   = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&tqx=out:json&tq=${encodeURIComponent(query)}`;
+/* ===================
+   3. BUSCAR DADOS
+   =================== */
+async function fetchByArucoId(id){
+  const tq = `select A,B,C,D where A=${id} limit 1`;
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
 
-  try {
-    const txt  = await fetch(url).then(r => r.text());
-    const json = JSON.parse(txt.substring(txt.indexOf("{"), txt.lastIndexOf("}")+1));
-    const row  = json.table.rows[0].c;
+  const txt = await fetch(url).then(r => r.text());
+  const json = JSON.parse(txt.substring(txt.indexOf("{"), txt.lastIndexOf("}")+1));
+  const row = json.table.rows[0].c;
 
-    return {
-      nome:        row[1].v,
-      torque:      row[2].v,
-      corrente:    row[3].v,
-      temperatura: row[4].v
-    };
-
-  } catch(e){
-    return null;
-  }
+  return {
+    id: row[0].v,
+    nome: row[1].v,
+    torque: row[2].v,
+    corrente: row[3].v,
+    temperatura: row[4].v
+  };
 }
 
-// =============================
-// DETECTAR O ID REAL DO MARCADOR
-// =============================
+/* ===================
+   4. ATUALIZA UI
+   =================== */
+async function updateMotor(id){
+  console.log("🎯 Atualizando motor para ID ArUco: ", id);
+
+  const d = await fetchByArucoId(id);
+
+  document.getElementById("titulo").setAttribute("value", d.nome);
+
+  gauges.t.value = d.torque;
+  gauges.c.value = d.corrente;
+  gauges.temp.value = d.temperatura;
+
+  gauges.t.draw();
+  gauges.c.draw();
+  gauges.temp.draw();
+}
+
+/* ===================
+   5. DETECTOR ARUCO
+   =================== */
 AFRAME.registerComponent("aruco-listener", {
   tick: function(){
     const marker = document.querySelector("#arucoMarker");
-    if(marker && marker.object3D.visible){
-      const realId = marker.components["marker"].data.value;
 
-      updateMotor(realId);
+    if(marker && marker.object3D.visible){
+      let detectedId = null;
+
+      try {
+        detectedId = marker.components.marker.data.value;
+      } catch(e){
+        console.warn("Marcador detectado, mas ID não pôde ser lido.", e);
+        return;
+      }
+
+      console.log("📡 ArUco detectado:", detectedId);
+
+      updateMotor(detectedId);
     }
   }
 });
-
-document.querySelector("#arucoMarker").setAttribute("aruco-listener","");
-
-// =============================
-let lastId = null;
-
-async function updateMotor(id){
-  if(id === lastId) return;
-  lastId = id;
-
-  const data = await fetchMotorByAruco(id);
-  if(!data){
-    document.querySelector("#titulo").setAttribute("value", "Sem dados para ID " + id);
-    return;
-  }
-
-  document.querySelector("#titulo").setAttribute("value", data.nome);
-
-  gauges.torque.value      = data.torque;
-  gauges.corrente.value    = data.corrente;
-  gauges.temperatura.value = data.temperatura;
-
-  gauges.torque.draw();
-  gauges.corrente.draw();
-  gauges.temperatura.draw();
-}
-
 </script>
 
 </body>
