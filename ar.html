@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AR Motores – Suzano</title>
 
-  <!-- A-Frame + MindAR (UMD, estável) -->
+  <!-- A-Frame + MindAR (estável) -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
@@ -16,14 +16,7 @@
     body { margin:0; overflow:hidden; background:#000; font-family: Arial; }
     canvas { display:none; } /* canvases escondidos, usados só como textura */
     .error { position:absolute; top:10px; left:10px; z-index:1000; color:#fff; background:rgba(0,0,0,0.5); padding:8px; border-radius:5px; display:none;}
-    a-scene {
-      width: 100vw;
-      height: 100vh;
-      position: fixed;
-      top: 0;
-      left: 0;
-      overflow: hidden;
-    }
+    a-scene { width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; overflow: hidden; }
   </style>
 </head>
 
@@ -42,34 +35,27 @@
   vr-mode-ui="enabled: false"
   device-orientation-permission-ui="enabled: true"
 >
-  <!-- Camera -->
   <a-camera position="0 0 0"></a-camera>
 
-  <!-- Anchor para a imagem alvo -->
   <a-entity mindar-image-target="targetIndex: 0" id="anchor">
-
       <!-- Título do motor -->
       <a-text id="titulo"
               value="Carregando..."
-              position="0 0.8 0"
+              position="0 1 0"
               align="center"
               color="#00AEEF"
               width="2">
       </a-text>
 
-      <!-- Planos para gauges (serão preenchidos dinamicamente) -->
-      <a-plane id="planeTorque" position="-0.7 0 0" width="0.9" height="0.9" material="src:#gTorque; transparent:true" visible="false"></a-plane>
-      <a-plane id="planeCorrente" position="0 0 0" width="0.9" height="0.9" material="src:#gCorrente; transparent:true" visible="false"></a-plane>
-      <a-plane id="planeTemp" position="0.7 0 0" width="0.9" height="0.9" material="src:#gTemperatura; transparent:true" visible="false"></a-plane>
-
+      <!-- Painéis dos Gauges -->
+      <a-plane position="-1 0.3 0" width="0.8" height="0.8" material="src: #gTorque; transparent: true"></a-plane>
+      <a-plane position="0 0.3 0" width="0.8" height="0.8" material="src: #gCorrente; transparent: true"></a-plane>
+      <a-plane position="1 0.3 0" width="0.8" height="0.8" material="src: #gTemperatura; transparent: true"></a-plane>
   </a-entity>
 </a-scene>
 
 <script>
 (async function(){
-  const SHEET_ID   = "1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k";
-  const SHEET_NAME = "SERVOS";
-
   const errbox = document.getElementById('errbox');
   function showError(msg){
     errbox.style.display = 'block';
@@ -82,24 +68,16 @@
   }
 
   async function fetchMotor(id){
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&tqx=out:json`;
-    const txt = await fetch(url).then(r => r.text());
-    const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}')+1);
-    const obj = JSON.parse(jsonStr);
-    const rows = obj.table.rows;
-  
-    if(!rows || rows.length === 0) throw new Error('Planilha vazia ou não encontrada.');
-  
-    // Filtra pelo nome do motor na coluna A
-    const row = rows.find(r => r.c[0] && r.c[0].v === id);
-    if(!row) throw new Error(`Motor "${id}" não encontrado na planilha.`);
-  
-    return {
-      nome: row.c[0].v,
-      torque: row.c[1].v,
-      corrente: row.c[2].v,
-      temperatura: row.c[3].v
-    };
+    try {
+      const url = `https://script.google.com/macros/s/AKfycbw_1jVhRGzErkeQgBSu4JQTbh_24150E5DB8jP84VfTKEd08ESrhtlWPgau0KeWnKVj/exec?id=${id}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if(!data || !data.id) throw new Error(`Motor "${id}" não encontrado`);
+      return data;
+    } catch(e){
+      showError(e.message);
+      throw e;
+    }
   }
 
   function createGauges(){
@@ -127,51 +105,35 @@
   const gauges = createGauges();
 
   const motorId = getParam('motor');
-  if(!motorId){
-    showError('Parâmetro ?motor= ausente na URL.');
-    return;
-  }
+  if(!motorId) { showError('Parâmetro ?motor= ausente na URL.'); return; }
 
-  // Seleciona o anchor
-  const anchor = document.getElementById('anchor');
+  try {
+    const data = await fetchMotor(motorId);
 
-  anchor.addEventListener('targetFound', async () => {
-    console.log("Alvo detectado!");
-    try {
-      const data = await fetchMotor(motorId);
+    document.getElementById('titulo').setAttribute('value', data.id);
 
-      document.getElementById('titulo').setAttribute('value', data.nome);
+    gauges.torqueGauge.value = data.torque;
+    gauges.correnteGauge.value = data.corrente;
+    gauges.temperaturaGauge.value = data.temperatura;
 
-      gauges.torqueGauge.value = data.torque;
-      gauges.correnteGauge.value = data.corrente;
-      gauges.temperaturaGauge.value = data.temperatura;
+    gauges.torqueGauge.draw();
+    gauges.correnteGauge.draw();
+    gauges.temperaturaGauge.draw();
 
+    // atualizações contínuas
+    setInterval(async () => {
+      const d = await fetchMotor(motorId);
+      gauges.torqueGauge.value = d.torque;
+      gauges.correnteGauge.value = d.corrente;
+      gauges.temperaturaGauge.value = d.temperatura;
       gauges.torqueGauge.draw();
       gauges.correnteGauge.draw();
       gauges.temperaturaGauge.draw();
+    }, 8000);
 
-      // torna os planos visíveis
-      document.getElementById('planeTorque').setAttribute('visible', true);
-      document.getElementById('planeCorrente').setAttribute('visible', true);
-      document.getElementById('planeTemp').setAttribute('visible', true);
-
-      // atualizações contínuas
-      setInterval(async () => {
-        const d = await fetchMotor(motorId);
-        gauges.torqueGauge.value = d.torque;
-        gauges.correnteGauge.value = d.corrente;
-        gauges.temperaturaGauge.value = d.temperatura;
-
-        gauges.torqueGauge.draw();
-        gauges.correnteGauge.draw();
-        gauges.temperaturaGauge.draw();
-      }, 8000);
-
-    } catch(e){
-      showError(e.message);
-    }
-  });
-
+  } catch(err){
+    console.error(err);
+  }
 })();
 </script>
 
