@@ -2,130 +2,186 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AR Motores – Suzano</title>
+
+  <!-- A-Frame + MindAR -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
   <!-- Gauges -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
 
-  <!-- js-aruco2 -->
-  <script src="https://cdn.jsdelivr.net/npm/js-aruco2@2.0.0/src/aruco.min.js"></script>
-
   <style>
-    body, html { margin:0; padding:0; overflow:hidden; background:#000; }
-    #video { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:1; }
-    #overlay { position:absolute; top:0; left:0; width:100%; height:100%; z-index:2; }
-    canvas { display:none; }
-    #errbox { position:absolute; top:10px; left:10px; color:#fff; background:rgba(0,0,0,0.6); padding:5px 8px; border-radius:5px; z-index:3; display:none; }
+    body { margin:0; overflow:hidden; font-family: Arial, sans-serif; background:#000; }
+    canvas { display:none; } /* canvases escondidos, usados só como textura */
+    .arjs-loader {
+      height: 100%; width: 100%; position: absolute; top: 0; left: 0;
+      background: rgba(0,0,0,0.85); z-index: 9999;
+      display:flex; justify-content:center; align-items:center; color:#fff;
+      font-size:18px;
+    }
+    .error { position: absolute; left: 10px; top: 10px; z-index:10001; color:#fff; background:rgba(0,0,0,0.6); padding:8px; border-radius:6px; display:none;}
   </style>
 </head>
 <body>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="overlay"></canvas>
-  <div id="errbox"></div>
 
-  <!-- Canvases dos gauges -->
-  <canvas id="gTorque" width="512" height="512"></canvas>
-  <canvas id="gCorrente" width="512" height="512"></canvas>
-  <canvas id="gTemperatura" width="512" height="512"></canvas>
+<div class="arjs-loader" id="loader">Carregando AR... aguarde</div>
+<div class="error" id="errbox"></div>
+
+<!-- Canvases para os gauges -->
+<canvas id="gTorque" width="512" height="512"></canvas>
+<canvas id="gCorrente" width="512" height="512"></canvas>
+<canvas id="gTemperatura" width="512" height="512"></canvas>
+
+<!-- Cena AR -->
+<a-scene
+  mindar-image="imageTargetSrc: assets/targets.mind; maxTrack: 1;"
+  color-space="sRGB"
+  renderer="colorManagement: true, physicallyCorrectLights: true"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: true"
+  embedded
+>
+  <a-camera position="0 0 0"></a-camera>
+</a-scene>
 
 <script>
 (async function(){
-  const SHEET_ID   = "1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k";
-  const SHEET_NAME = "SERVOS";
+  // ================= CONFIGURAÇÃO =================
+  const SHEET_ID = '1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k';
+  const SHEET_NAME = 'SERVOS';
 
-  const ARUCO_MAP = {}; // será preenchido dinamicamente
-
-  const video = document.getElementById("video");
-  const overlay = document.getElementById("overlay");
-  const ctx = overlay.getContext("2d");
-
-  const errbox = document.getElementById("errbox");
-  function showError(msg){ errbox.style.display='block'; errbox.textContent=msg; console.error(msg); }
-
-  // ======= GAUGES =======
-  function createGauges(){
-    return {
-      t: new RadialGauge({ renderTo:"gTorque", width:512, height:512, minValue:0, maxValue:100, units:"Torque (Nm)", value:0, majorTicks:["0","20","40","60","80","100"] }).draw(),
-      c: new RadialGauge({ renderTo:"gCorrente", width:512, height:512, minValue:0, maxValue:100, units:"Corrente (A)", value:0 }).draw(),
-      temp: new RadialGauge({ renderTo:"gTemperatura", width:512, height:512, minValue:0, maxValue:120, units:"Temperatura (°C)", value:0 }).draw()
-    };
-  }
-  const gauges = createGauges();
-
-  // ======= BUSCAR DADOS =======
-  async function fetchMotorByAruco(id){
-    const tq = `select A,B,C,D,E where A='${id}' limit 1`;
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
-    const txt = await fetch(url).then(r=>r.text());
-    const json = JSON.parse(txt.substring(txt.indexOf("{"), txt.lastIndexOf("}")+1));
-    const row = json.table.rows[0]?.c;
-    if(!row) throw new Error("Motor não encontrado na planilha.");
-    return {
-      id: row[0]?.v,
-      nome: row[1]?.v,
-      torque: row[2]?.v,
-      corrente: row[3]?.v,
-      temperatura: row[4]?.v
-    };
+  function showError(msg){
+    const e = document.getElementById('errbox');
+    e.style.display = 'block';
+    e.textContent = msg;
+    console.error(msg);
   }
 
-  // ======= CAMERA =======
-  try{
-    const stream = await navigator.mediaDevices.getUserMedia({video:{ facingMode:"environment" }});
-    video.srcObject = stream;
-    await video.play();
-  }catch(e){ showError("Não foi possível acessar a câmera: "+e.message); return; }
-
-  // Ajusta overlay
-  function resizeCanvas(){
-    overlay.width = video.videoWidth;
-    overlay.height = video.videoHeight;
+  function getParam(name){
+    return new URLSearchParams(location.search).get(name) || '';
   }
-  video.addEventListener("loadedmetadata", resizeCanvas);
 
-  // ======= ARUCO DETECTOR =======
-  const detector = new AR.Detector();
-  async function loop(){
-    ctx.drawImage(video,0,0,overlay.width,overlay.height);
-    const imageData = ctx.getImageData(0,0,overlay.width,overlay.height);
-    const markers = detector.detect(imageData);
-
-    if(markers.length > 0){
-      for(const m of markers){
-        const motor = await fetchMotorByAruco(m.id).catch(()=>null);
-        if(!motor) continue;
-
-        // Atualiza gauges
-        gauges.t.value = motor.torque; gauges.t.draw();
-        gauges.c.value = motor.corrente; gauges.c.draw();
-        gauges.temp.value = motor.temperatura; gauges.temp.draw();
-
-        // Desenha retângulo e nome sobre o marcador
-        ctx.strokeStyle="#00AEEF"; ctx.lineWidth=4;
-        ctx.beginPath();
-        for(let i=0;i<m.corners.length;i++){
-          const c1 = m.corners[i];
-          const c2 = m.corners[(i+1)%4];
-          ctx.moveTo(c1.x, c1.y);
-          ctx.lineTo(c2.x, c2.y);
-        }
-        ctx.stroke();
-
-        ctx.fillStyle="#00AEEF";
-        ctx.font="24px Arial";
-        ctx.fillText(motor.nome,m.corners[0].x,m.corners[0].y-10);
-      }
+  async function fetchMotor(motorId){
+    try{
+      const tq = `select A,B,C,D,E where B='${motorId}' limit 1`;
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
+      const res = await fetch(url);
+      if(!res.ok) throw new Error('Erro ao acessar planilha');
+      const txt = await res.text();
+      const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}') + 1);
+      const obj = JSON.parse(jsonStr);
+      const row = obj.table.rows[0].c;
+      return {
+        id_aruco: row[0]?.v || 0,
+        nome: row[1]?.v || motorId,
+        torque: Number(row[2]?.v) || 0,
+        corrente: Number(row[3]?.v) || 0,
+        temperatura: Number(row[4]?.v) || 0
+      };
+    }catch(e){
+      showError(e.message);
+      return null;
     }
-
-    requestAnimationFrame(loop);
   }
 
-  loop();
+  // ================= GAUGES =================
+  function createGauges(){
+    const torqueGauge = new RadialGauge({
+      renderTo:'gTorque', width:512, height:512, units:'Torque (Nm)',
+      minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], minorTicks:4,
+      borders:true, value:0,
+      highlights:[{from:0,to:60,color:'#30B32D'},{from:60,to:85,color:'#FFDD00'},{from:85,to:100,color:'#F03E3E'}]
+    }).draw();
+
+    const correnteGauge = new RadialGauge({
+      renderTo:'gCorrente', width:512, height:512, units:'Corrente (A)',
+      minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], minorTicks:4,
+      borders:true, value:0
+    }).draw();
+
+    const temperaturaGauge = new RadialGauge({
+      renderTo:'gTemperatura', width:512, height:512, units:'°C',
+      minValue:0, maxValue:120, majorTicks:['0','20','40','60','80','100','120'], minorTicks:4,
+      borders:true, value:0
+    }).draw();
+
+    return {torqueGauge, correnteGauge, temperaturaGauge};
+  }
+
+  function updateGauges(gauges, data){
+    gauges.torqueGauge.value = data.torque;
+    gauges.correnteGauge.value = data.corrente;
+    gauges.temperaturaGauge.value = data.temperatura;
+    gauges.torqueGauge.draw();
+    gauges.correnteGauge.draw();
+    gauges.temperaturaGauge.draw();
+  }
+
+  // ================= INICIALIZAÇÃO =================
+  const motorId = getParam('motor');
+  if(!motorId){
+    showError('Parâmetro ?motor= ausente na URL.');
+    document.getElementById('loader').style.display = 'none';
+    return;
+  }
+
+  const gauges = createGauges();
+  const data = await fetchMotor(motorId);
+  if(!data) return;
+
+  // Cria âncora quando target detectado
+  const scene = document.querySelector('a-scene');
+  const anchor = document.createElement('a-entity');
+  anchor.setAttribute('mindar-image-target', `targetIndex: 0`);
+  anchor.setAttribute('data-ar-anchor', 'true');
+
+  // Nome do motor
+  const title = document.createElement('a-text');
+  title.setAttribute('value', data.nome);
+  title.setAttribute('color','#0051A2');
+  title.setAttribute('align','center');
+  title.setAttribute('position','0 1 0');
+  title.setAttribute('scale','1.5 1.5 1');
+
+  // Planos com gauges
+  const planeTorque = document.createElement('a-plane');
+  planeTorque.setAttribute('position','-0.6 0.25 0');
+  planeTorque.setAttribute('width','0.7');
+  planeTorque.setAttribute('height','0.7');
+  planeTorque.setAttribute('material','src: #gTorque; transparent: true');
+
+  const planeCorr = document.createElement('a-plane');
+  planeCorr.setAttribute('position','0.6 0.25 0');
+  planeCorr.setAttribute('width','0.7');
+  planeCorr.setAttribute('height','0.7');
+  planeCorr.setAttribute('material','src: #gCorrente; transparent: true');
+
+  const planeTemp = document.createElement('a-plane');
+  planeTemp.setAttribute('position','0 -0.4 0');
+  planeTemp.setAttribute('width','1.0');
+  planeTemp.setAttribute('height','0.7');
+  planeTemp.setAttribute('material','src: #gTemperatura; transparent: true');
+
+  anchor.appendChild(title);
+  anchor.appendChild(planeTorque);
+  anchor.appendChild(planeCorr);
+  anchor.appendChild(planeTemp);
+  scene.appendChild(anchor);
+
+  document.getElementById('loader').style.display = 'none';
+
+  // Atualizações periódicas
+  setInterval(async () => {
+    const d = await fetchMotor(motorId);
+    if(d) updateGauges(gauges, d);
+  }, 10000);
 
 })();
 </script>
+
 </body>
 </html>
-
