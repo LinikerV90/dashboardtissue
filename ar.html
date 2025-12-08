@@ -1,187 +1,133 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Motor AR Dashboard</title>
+  <meta charset="UTF-8" />
+  <title>AR Dashboard</title>
 
-    <!-- CORRETO: A-FRAME 1.2.0 -->
-    <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+  <!-- A-FRAME + MINDAR (VERSÃO CORRETA) -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
 
-    <!-- CORRETO: MINDAR 1.2.0 -->
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: Arial;
+    }
 
-    <style>
-        body { margin: 0; overflow: hidden; background: black; }
-    </style>
+    a-scene {
+      width: 100vw !important;
+      height: 100vh !important;
+      position: fixed;
+      top: 0;
+      left: 0;
+      overflow: hidden;
+    }
+
+    .error {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 8px 12px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      border-radius: 6px;
+      z-index: 9999;
+      display: none;
+    }
+  </style>
 </head>
-
 
 <body>
 
-<script>
-    // ===== PEGAR MOTOR DA URL =====
-    const urlParams = new URLSearchParams(window.location.search);
-    const motorID = urlParams.get("motor") || "N/A";
-    console.log("Motor selecionado:", motorID);
+<div class="error" id="errorBox"></div>
 
-    // ======= FUNÇÃO PARA BUSCAR DADOS DO MOTOR =========
-    async function carregarDados() {
-        try {
-            const req = await fetch(
-                "https://script.google.com/macros/s/AKfycbzWXgOsZwGooFNxmK6uFCkGoT_1fJ_g5sF99HLZMG0dkypXgxoxj5y_oqsmJK0k61diqg/exec?motor=" + motorID
-            );
+<a-scene
+  mindar-image="imageTargetSrc: ./asset/targets.mind;"
+  color-space="sRGB"
+  renderer="colorManagement: true, physicallyCorrectLights"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false">
 
-            const json = await req.json();
-            console.log("JSON recebido:", json);
+  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-            if (!json || !json.id) return;
+  <a-entity mindar-image-target="targetIndex: 0" id="anchor">
 
-            // Atualiza título do motor
-            document.querySelector("#titulo-motor").setAttribute("value", json.id);
-
-            atualizarGauge(json.torque, 100, "#ring-torque", "#valor-torque");
-            atualizarGauge(json.corrente, 20, "#ring-corrente", "#valor-corrente");
-            atualizarGauge(json.temperatura, 120, "#ring-temp", "#valor-temp");
-
-        } catch (e) {
-            console.error("ERRO ao carregar dados:", e);
-        }
-    }
-
-    // ====== FUNÇÃO DE ATUALIZAÇÃO DO GAUGE ======
-    function atualizarGauge(valor, max, idRing, idText) {
-        const percent = Math.min(Math.max(valor / max, 0), 1);
-        const angulo = percent * 270;  // gauge circular parcial
-
-        document.querySelector(idRing).setAttribute("theta-length", angulo);
-        document.querySelector(idText).setAttribute("value", valor);
-    }
-</script>
-
-<!-- ========================= AR SCENE ============================ -->
-<a-scene mindar-image="imageTargetSrc: ./asset/targets.mind;"
-         vr-mode-ui="enabled: false"
-         device-orientation-permission-ui="enabled: true">
-
-    <a-assets>
-        <img id="logo-suzano" src="./asset/suzano.png">
-    </a-assets>
-
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-    <!-- ======================= TARGET ======================== -->
-    <a-entity mindar-image-target="targetIndex: 0" id="marker">
-
-        <!-- TÍTULO / ID DO MOTOR -->
-        <a-text id="titulo-motor"
-                value="Carregando..."
-                color="#FFFFFF"
-                width="2"
-                align="center"
-                position="0 1.1 0.01"
-                font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-        </a-text>
-
-        <!-- ============ GAUGE TORQUE =============== -->
-        <a-entity position="-1 0.1 0">
-            <a-circle radius="0.55" color="#222"></a-circle>
-
-            <a-ring id="ring-torque"
-                    radius-inner="0.38"
-                    radius-outer="0.52"
-                    color="#7CFC88"
-                    theta-start="0"
-                    theta-length="0">
-            </a-ring>
-
-            <a-text id="valor-torque"
-                    value="0"
-                    align="center"
-                    width="1.5"
-                    color="#7CFC88"
-                    position="0 0 0.01"
-                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-            </a-text>
-
-            <a-text value="TORQUE"
-                    align="center"
-                    width="1.5"
-                    color="#ccc"
-                    position="0 -0.45 0.01"
-                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-            </a-text>
-        </a-entity>
-
-        <!-- ============ GAUGE CORRENTE =============== -->
-        <a-entity position="0 0.1 0">
-            <a-circle radius="0.55" color="#222"></a-circle>
-
-            <a-ring id="ring-corrente"
-                    radius-inner="0.38"
-                    radius-outer="0.52"
-                    color="#78C2FF"
-                    theta-start="0"
-                    theta-length="0">
-            </a-ring>
-
-            <a-text id="valor-corrente"
-                    value="0"
-                    align="center"
-                    width="1.5"
-                    color="#78C2FF"
-                    position="0 0 0.01"
-                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-            </a-text>
-
-            <a-text value="CORRENTE"
-                    align="center"
-                    width="1.5"
-                    color="#ccc"
-                    position="0 -0.45 0.01"
-                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-            </a-text>
-        </a-entity>
-
-        <!-- ============ GAUGE TEMPERATURA =============== -->
-        <a-entity position="1 0.1 0">
-            <a-circle radius="0.55" color="#222"></a-circle>
-
-            <a-ring id="ring-temp"
-                    radius-inner="0.38"
-                    radius-outer="0.52"
-                    color="#FF6A6A"
-                    theta-start="0"
-                    theta-length="0">
-            </a-ring>
-
-            <a-text id="valor-temp"
-                    value="0"
-                    align="center"
-                    width="1.5"
-                    color="#FF6A6A"
-                    position="0 0 0.01"
-                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-            </a-text>
-
-            <a-text value="TEMPERATURA"
-                    align="center"
-                    width="1.5"
-                    color="#ccc"
-                    position="0 -0.45 0.01"
-                    font="https://cdn.aframe.io/fonts/Exo2Bold.fnt">
-            </a-text>
-        </a-entity>
-
+    <a-entity id="gaugeTorque" position="0 0.6 0" visible="false">
+      <a-cylinder height="0.05" radius="0.5" color="#0044ff"></a-cylinder>
+      <a-text id="torqueLabel" value="Torque: 0" position="-0.4 0.1 0.1" color="#fff" width="2"></a-text>
     </a-entity>
+
+    <a-entity id="gaugeCorrente" position="0 0 0" visible="false">
+      <a-cylinder height="0.05" radius="0.5" color="#00ff44"></a-cylinder>
+      <a-text id="correnteLabel" value="Corrente: 0" position="-0.4 0.1 0.1" color="#fff" width="2"></a-text>
+    </a-entity>
+
+    <a-entity id="gaugeTemp" position="0 -0.6 0" visible="false">
+      <a-cylinder height="0.05" radius="0.5" color="#ff4400"></a-cylinder>
+      <a-text id="tempLabel" value="Temp: 0" position="-0.4 0.1 0.1" color="#fff" width="2"></a-text>
+    </a-entity>
+
+  </a-entity>
+
 </a-scene>
 
 <script>
-    // Chamar API somente quando a imagem for detectada
-    document.querySelector("#marker").addEventListener("targetFound", () => {
-        console.log("Imagem detectada! Atualizando dados...");
-        carregarDados();
-    });
+  function showError(msg) {
+    const box = document.getElementById("errorBox");
+    box.innerText = msg;
+    box.style.display = "block";
+  }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const motorId = urlParams.get("motor");
+
+  if (!motorId) showError("Nenhum ID de motor informado. Use ?motor=MTR001");
+
+  console.log("Motor selecionado:", motorId);
+
+  async function loadMotorData() {
+    try {
+      const res = await fetch(
+        `https://script.google.com/macros/s/AKfycbw_1jVhRGzErkeQgBSu4JQTbh_24150E5DB8jP84VfTKEd08ESrhtlWPgau0KeWnKVj/exec?id=${motorId}`
+      );
+
+      const data = await res.json();
+      console.log("JSON recebido:", data);
+
+      if (!data.id) {
+        showError("Motor não encontrado.");
+        return;
+      }
+
+      document.getElementById("torqueLabel").setAttribute("value", `Torque: ${data.torque}`);
+      document.getElementById("correnteLabel").setAttribute("value", `Corrente: ${data.corrente}`);
+      document.getElementById("tempLabel").setAttribute("value", `Temp: ${data.temperatura}`);
+
+    } catch (err) {
+      console.error(err);
+      showError("Erro ao consultar Apps Script.");
+    }
+  }
+
+  loadMotorData();
+
+  const anchor = document.getElementById("anchor");
+
+  anchor.addEventListener("targetFound", () => {
+    console.log("Imagem detectada! Mostrando gauges.");
+    document.getElementById("gaugeTorque").setAttribute("visible", true);
+    document.getElementById("gaugeCorrente").setAttribute("visible", true);
+    document.getElementById("gaugeTemp").setAttribute("visible", true);
+  });
+
+  anchor.addEventListener("targetLost", () => {
+    console.log("Imagem perdida. Ocultando gauges.");
+    document.getElementById("gaugeTorque").setAttribute("visible", false);
+    document.getElementById("gaugeCorrente").setAttribute("visible", false);
+    document.getElementById("gaugeTemp").setAttribute("visible", false);
+  });
 </script>
 
 </body>
