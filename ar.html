@@ -1,9 +1,8 @@
- <!-- Desenvolvido por Liniker Venturini da Silva -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AR Motores – Suzano</title>
 
   <!-- A-Frame + MindAR -->
@@ -15,15 +14,17 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
 
   <style>
-    body { margin:0; overflow:hidden; font-family: Arial, sans-serif; background:#000; }
-    canvas { display:none; } /* canvases escondidos, usados só como textura */
+    body { margin:0; overflow:hidden; font-family: Arial; background:#000; }
+    canvas { display:none; } /* canvases escondidos, usados como textura */
     .arjs-loader {
-      height: 100%; width: 100%; position: absolute; top: 0; left: 0;
-      background: rgba(0,0,0,0.85); z-index: 9999;
-      display:flex; justify-content:center; align-items:center; color:#fff;
-      font-size:18px;
+      position: absolute; top:0; left:0; width:100%; height:100%;
+      display:flex; justify-content:center; align-items:center;
+      background: rgba(0,0,0,0.85); color:#fff; font-size:18px; z-index:9999;
     }
-    .error { position: absolute; left: 10px; top: 10px; z-index:10001; color:#fff; background:rgba(0,0,0,0.6); padding:8px; border-radius:6px; display:none;}
+    .error {
+      position:absolute; top:10px; left:10px; padding:8px; background:rgba(0,0,0,0.6);
+      color:#fff; border-radius:6px; display:none; z-index:10000;
+    }
   </style>
 </head>
 <body>
@@ -31,28 +32,25 @@
 <div class="arjs-loader" id="loader">Carregando AR... aguarde</div>
 <div class="error" id="errbox"></div>
 
-<!-- Canvases para os gauges -->
+<!-- Canvases dos gauges -->
 <canvas id="gTorque" width="512" height="512"></canvas>
 <canvas id="gCorrente" width="512" height="512"></canvas>
 <canvas id="gTemperatura" width="512" height="512"></canvas>
 
-<!-- Cena AR -->
-<a-scene
-  mindar-image="imageTargetSrc: assets/targets.mind; maxTrack: 1;"
-  color-space="sRGB"
-  renderer="colorManagement: true, physicallyCorrectLights: true"
-  vr-mode-ui="enabled: false"
-  device-orientation-permission-ui="enabled: true"
-  embedded
->
+<a-scene mindar-image="imageTargetSrc: assets/targets.mind;" embedded color-space="sRGB"
+         renderer="colorManagement: true, physicallyCorrectLights: true"
+         vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: true">
+
   <a-camera position="0 0 0"></a-camera>
+
 </a-scene>
 
 <script>
 (async function(){
-  // ================= CONFIGURAÇÃO =================
-  const SHEET_ID = '1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k';
+
+  const SHEET_ID   = '1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k';
   const SHEET_NAME = 'SERVOS';
+  const TARGET_INDEX = 0; // usamos uma única imagem como alvo
 
   function showError(msg){
     const e = document.getElementById('errbox');
@@ -65,114 +63,107 @@
     return new URLSearchParams(location.search).get(name) || '';
   }
 
-async function fetchMotor(id){
-  const tq = `select A,B,C,D,E where B='${id}' limit 1`; // se usar nome
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
+  async function fetchMotor(nome){
+    const tq = `select A,B,C,D where A='${nome}' limit 1`;
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
+    const txt = await fetch(url).then(r => r.text());
+    const json = JSON.parse(txt.substring(txt.indexOf('{'), txt.lastIndexOf('}')+1));
+    if(!json.table.rows.length) throw new Error(`Motor "${nome}" não encontrado na planilha.`);
+    const row = json.table.rows[0].c;
+    return {
+      nome: row[0]?.v,
+      torque: Number(row[1]?.v) || 0,
+      corrente: Number(row[2]?.v) || 0,
+      temperatura: Number(row[3]?.v) || 0
+    };
+  }
 
-  const txt = await fetch(url).then(r => r.text());
-  const json = JSON.parse(txt.substring(txt.indexOf("{"), txt.lastIndexOf("}")+1));
-  const row = json.table.rows[0]?.c;
-  if(!row) throw new Error(`Motor "${id}" não encontrado na planilha.`);
-
-  return {
-    id: row[0]?.v,
-    nome: row[1]?.v,
-    torque: row[2]?.v,
-    corrente: row[3]?.v,
-    temperatura: row[4]?.v
-  };
-}
-  // ================= GAUGES =================
   function createGauges(){
-    const torqueGauge = new RadialGauge({
-      renderTo:'gTorque', width:512, height:512, units:'Torque (Nm)',
-      minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], minorTicks:4,
-      borders:true, value:0,
-      highlights:[{from:0,to:60,color:'#30B32D'},{from:60,to:85,color:'#FFDD00'},{from:85,to:100,color:'#F03E3E'}]
-    }).draw();
-
-    const correnteGauge = new RadialGauge({
-      renderTo:'gCorrente', width:512, height:512, units:'Corrente (A)',
-      minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], minorTicks:4,
-      borders:true, value:0
-    }).draw();
-
-    const temperaturaGauge = new RadialGauge({
-      renderTo:'gTemperatura', width:512, height:512, units:'°C',
-      minValue:0, maxValue:120, majorTicks:['0','20','40','60','80','100','120'], minorTicks:4,
-      borders:true, value:0
-    }).draw();
-
-    return {torqueGauge, correnteGauge, temperaturaGauge};
+    return {
+      torqueGauge: new RadialGauge({
+        renderTo:'gTorque', width:512, height:512, units:'Torque (Nm)',
+        minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], value:0
+      }).draw(),
+      correnteGauge: new RadialGauge({
+        renderTo:'gCorrente', width:512, height:512, units:'Corrente (A)',
+        minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], value:0
+      }).draw(),
+      temperaturaGauge: new RadialGauge({
+        renderTo:'gTemperatura', width:512, height:512, units:'°C',
+        minValue:0, maxValue:120, majorTicks:['0','20','40','60','80','100','120'], value:0
+      }).draw()
+    };
   }
 
-  function updateGauges(gauges, data){
-    gauges.torqueGauge.value = data.torque;
-    gauges.correnteGauge.value = data.corrente;
-    gauges.temperaturaGauge.value = data.temperatura;
-    gauges.torqueGauge.draw();
-    gauges.correnteGauge.draw();
-    gauges.temperaturaGauge.draw();
+  function updateGauges(g, d){
+    g.torqueGauge.value = d.torque; g.torqueGauge.draw();
+    g.correnteGauge.value = d.corrente; g.correnteGauge.draw();
+    g.temperaturaGauge.value = d.temperatura; g.temperaturaGauge.draw();
   }
 
-  // ================= INICIALIZAÇÃO =================
-  const motorId = getParam('motor');
-  if(!motorId){
-    showError('Parâmetro ?motor= ausente na URL.');
-    document.getElementById('loader').style.display = 'none';
-    return;
+  function buildAnchor(data){
+    const scene = document.querySelector('a-scene');
+    const existing = scene.querySelectorAll('[data-ar-anchor]');
+    existing.forEach(n => n.parentNode && n.parentNode.removeChild(n));
+
+    const anchor = document.createElement('a-entity');
+    anchor.setAttribute('mindar-image-target', `targetIndex: ${TARGET_INDEX}`);
+    anchor.setAttribute('data-ar-anchor', 'true');
+
+    const title = document.createElement('a-text');
+    title.setAttribute('value', data.nome);
+    title.setAttribute('color','#0051A2');
+    title.setAttribute('align','center');
+    title.setAttribute('position','0 0.9 0');
+    title.setAttribute('scale','1.2 1.2 1');
+
+    const planeTorque = document.createElement('a-plane');
+    planeTorque.setAttribute('position','-0.6 0.25 0');
+    planeTorque.setAttribute('width','0.7');
+    planeTorque.setAttribute('height','0.7');
+    planeTorque.setAttribute('material','src: #gTorque; transparent: true');
+
+    const planeCorr = document.createElement('a-plane');
+    planeCorr.setAttribute('position','0.6 0.25 0');
+    planeCorr.setAttribute('width','0.7');
+    planeCorr.setAttribute('height','0.7');
+    planeCorr.setAttribute('material','src: #gCorrente; transparent: true');
+
+    const planeTemp = document.createElement('a-plane');
+    planeTemp.setAttribute('position','0 -0.4 0');
+    planeTemp.setAttribute('width','1.0');
+    planeTemp.setAttribute('height','0.7');
+    planeTemp.setAttribute('material','src: #gTemperatura; transparent: true');
+
+    anchor.appendChild(title);
+    anchor.appendChild(planeTorque);
+    anchor.appendChild(planeCorr);
+    anchor.appendChild(planeTemp);
+
+    scene.appendChild(anchor);
   }
 
-  const gauges = createGauges();
-  const data = await fetchMotor(motorId);
-  if(!data) return;
+  try {
+    const motorNome = getParam('motor');
+    if(!motorNome) throw new Error('Parâmetro ?motor= ausente na URL.');
 
-  // Cria âncora quando target detectado
-  const scene = document.querySelector('a-scene');
-  const anchor = document.createElement('a-entity');
-  anchor.setAttribute('mindar-image-target', `targetIndex: 0`);
-  anchor.setAttribute('data-ar-anchor', 'true');
+    const gauges = createGauges();
+    const data = await fetchMotor(motorNome);
 
-  // Nome do motor
-  const title = document.createElement('a-text');
-  title.setAttribute('value', data.nome);
-  title.setAttribute('color','#0051A2');
-  title.setAttribute('align','center');
-  title.setAttribute('position','0 1 0');
-  title.setAttribute('scale','1.5 1.5 1');
+    updateGauges(gauges, data);
+    buildAnchor(data);
 
-  // Planos com gauges
-  const planeTorque = document.createElement('a-plane');
-  planeTorque.setAttribute('position','-0.6 0.25 0');
-  planeTorque.setAttribute('width','0.7');
-  planeTorque.setAttribute('height','0.7');
-  planeTorque.setAttribute('material','src: #gTorque; transparent: true');
+    document.getElementById('loader').style.display='none';
 
-  const planeCorr = document.createElement('a-plane');
-  planeCorr.setAttribute('position','0.6 0.25 0');
-  planeCorr.setAttribute('width','0.7');
-  planeCorr.setAttribute('height','0.7');
-  planeCorr.setAttribute('material','src: #gCorrente; transparent: true');
+    setInterval(async ()=>{
+      const d = await fetchMotor(motorNome);
+      updateGauges(gauges,d);
+    }, 10000);
 
-  const planeTemp = document.createElement('a-plane');
-  planeTemp.setAttribute('position','0 -0.4 0');
-  planeTemp.setAttribute('width','1.0');
-  planeTemp.setAttribute('height','0.7');
-  planeTemp.setAttribute('material','src: #gTemperatura; transparent: true');
-
-  anchor.appendChild(title);
-  anchor.appendChild(planeTorque);
-  anchor.appendChild(planeCorr);
-  anchor.appendChild(planeTemp);
-  scene.appendChild(anchor);
-
-  document.getElementById('loader').style.display = 'none';
-
-  // Atualizações periódicas
-  setInterval(async () => {
-    const d = await fetchMotor(motorId);
-    if(d) updateGauges(gauges, d);
-  }, 10000);
+  } catch(e){
+    document.getElementById('loader').style.display='none';
+    showError(e.message);
+  }
 
 })();
 </script>
