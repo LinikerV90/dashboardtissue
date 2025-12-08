@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AR Motores – Suzano</title>
+  <title>AR Teste Gauge</title>
 
   <!-- A-Frame + MindAR -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
@@ -13,168 +13,70 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
 
   <style>
-    body { margin:0; overflow:hidden; background:#000; font-family: Arial; }
-    /* canvases escondidos, mas não com display:none */
+    body { margin:0; overflow:hidden; background:#000; }
     canvas { visibility:hidden; position:absolute; left:-9999px; }
-    .error { position:absolute; top:10px; left:10px; z-index:1000; color:#fff; background:rgba(0,0,0,0.5); padding:8px; border-radius:5px; display:none;}
-    a-scene {
-      width: 100vw;
-      height: 100vh;
-      position: fixed;
-      top: 0;
-      left: 0;
-      overflow: hidden;
-    }
   </style>
 </head>
-
 <body>
 
-<div class="error" id="errbox"></div>
-
-<!-- Canvases dos gauges -->
-<canvas id="gTorque" width="512" height="512"></canvas>
-<canvas id="gCorrente" width="512" height="512"></canvas>
-<canvas id="gTemperatura" width="512" height="512"></canvas>
-
-<a-scene 
+<a-scene
   mindar-image="imageTargetSrc: asset/targets.mind;"
   color-space="sRGB"
   vr-mode-ui="enabled: false"
   device-orientation-permission-ui="enabled: true"
 >
+  <a-assets>
+    <!-- canvas registrado como asset -->
+    <canvas id="gTorque" width="512" height="512"></canvas>
+  </a-assets>
+
   <a-camera position="0 0 0"></a-camera>
 
   <a-entity mindar-image-target="targetIndex: 0" id="anchor">
-      <a-text id="titulo"
-              value="Carregando..."
-              position="0 1 0"
-              align="center"
-              color="#00AEEF"
-              width="2">
-      </a-text>
-
-      <!-- Painéis dos gauges -->
-      <a-plane id="planeTorque" position="-0.7 0.25 0.01" width="0.9" height="0.9"></a-plane>
-      <a-plane id="planeCorrente" position="0.7 0.25 0.01" width="0.9" height="0.9"></a-plane>
-      <a-plane id="planeTemp" position="0 -0.6 0.01" width="1.4" height="0.9"></a-plane>
+    <a-text value="Teste Gauge" position="0 1 0" align="center" color="#00AEEF" width="2"></a-text>
+    <a-plane id="planeTorque" position="0 0 0.01" width="1.2" height="1.2"></a-plane>
   </a-entity>
 </a-scene>
 
 <script>
 (async function(){
-  const API_URL = "https://script.google.com/macros/s/AKfycbw_1jVhRGzErkeQgBSu4JQTbh_24150E5DB8jP84VfTKEd08ESrhtlWPgau0KeWnKVj/exec";
-  const errbox = document.getElementById('errbox');
-  function showError(msg){
-    errbox.style.display = 'block';
-    errbox.textContent = msg;
-    console.error(msg);
-  }
-
-  function getParam(name){
-    return new URLSearchParams(location.search).get(name) || '';
-  }
-
-  async function fetchMotor(id){
-    try {
-      const res = await fetch(`${API_URL}?id=${id}`);
-      const json = await res.json();
-      if(!json || !json.id) throw new Error(`Motor "${id}" não encontrado.`);
-      return json;
-    } catch(e){
-      showError(e.message);
-      throw e;
-    }
-  }
-
-  function createGauges(){
-    return {
-      torqueGauge: new RadialGauge({
-        renderTo: 'gTorque', width:512, height:512, units:'Torque (Nm)',
-        minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], minorTicks:4,
-        borders:true, value:0, highlights:[{from:0,to:60,color:'#30B32D'},{from:60,to:85,color:'#FFDD00'},{from:85,to:100,color:'#F03E3E'}]
-      }).draw(),
-
-      correnteGauge: new RadialGauge({
-        renderTo: 'gCorrente', width:512, height:512, units:'Corrente (A)',
-        minValue:0, maxValue:100, majorTicks:['0','20','40','60','80','100'], minorTicks:4,
-        borders:true, value:0, highlights:[{from:0,to:60,color:'#30B32D'},{from:60,to:85,color:'#FFDD00'},{from:85,to:100,color:'#F03E3E'}]
-      }).draw(),
-
-      temperaturaGauge: new RadialGauge({
-        renderTo: 'gTemperatura', width:512, height:512, units:'°C',
-        minValue:0, maxValue:120, majorTicks:['0','20','40','60','80','100','120'], minorTicks:4,
-        borders:true, value:0, highlights:[{from:0,to:70,color:'#30B32D'},{from:70,to:90,color:'#FFDD00'},{from:90,to:120,color:'#F03E3E'}]
-      }).draw()
-    };
-  }
-
-  const gauges = createGauges();
-  const motorId = getParam('motor');
-  if(!motorId) return showError('Parâmetro ?motor= ausente na URL.');
-
-  let data;
-  try { data = await fetchMotor(motorId); } catch(e){ return; }
+  // cria o gauge
+  const torqueGauge = new RadialGauge({
+    renderTo: 'gTorque',
+    width: 512,
+    height: 512,
+    units: 'Torque (Nm)',
+    minValue: 0,
+    maxValue: 100,
+    majorTicks: ['0','20','40','60','80','100'],
+    minorTicks: 4,
+    borders: true,
+    value: 50,
+    highlights: [
+      {from:0,to:60,color:'#30B32D'},
+      {from:60,to:85,color:'#FFDD00'},
+      {from:85,to:100,color:'#F03E3E'}
+    ]
+  }).draw();
 
   const anchor = document.getElementById('anchor');
-  const planes = ['planeTorque','planeCorrente','planeTemp'];
-  const canvases = ['gTorque','gCorrente','gTemperatura'];
+  const plane = document.getElementById('planeTorque');
 
   anchor.addEventListener("targetFound", () => {
-    console.log("Imagem detectada! Mostrando gauges.");
-
-    document.getElementById('titulo').setAttribute('value', data.id);
-
-    // Atualiza valores e desenha
-    gauges.torqueGauge.value = data.torque;
-    gauges.correnteGauge.value = data.corrente;
-    gauges.temperaturaGauge.value = data.temperatura;
-    gauges.torqueGauge.draw();
-    gauges.correnteGauge.draw();
-    gauges.temperaturaGauge.draw();
-
-    // Aplica os canvases aos planos e garante visibilidade
-    for (let i = 0; i < planes.length; i++) {
-      const plane = document.getElementById(planes[i]);
-      plane.setAttribute('material', `src: #${canvases[i]}; transparent: true;`);
-      plane.setAttribute('visible', 'true');
-      plane.setAttribute('rotation','0 0 0'); // ajuste conforme necessário
-
-      const mesh = plane.getObject3D('mesh');
-      if (mesh && mesh.material.map) {
-        mesh.material.map.needsUpdate = true;
-      }
-    }
-
-    // Atualizações contínuas
-    if(!anchor.updateInterval){
-      anchor.updateInterval = setInterval(async () => {
-        const d = await fetchMotor(motorId);
-        gauges.torqueGauge.value = d.torque;
-        gauges.correnteGauge.value = d.corrente;
-        gauges.temperaturaGauge.value = d.temperatura;
-        gauges.torqueGauge.draw();
-        gauges.correnteGauge.draw();
-        gauges.temperaturaGauge.draw();
-
-        // força atualização da textura a cada ciclo
-        for (let i = 0; i < planes.length; i++) {
-          const plane = document.getElementById(planes[i]);
-          const mesh = plane.getObject3D('mesh');
-          if (mesh && mesh.material.map) {
-            mesh.material.map.needsUpdate = true;
-          }
-        }
-      }, 8000);
+    console.log("Imagem detectada! Mostrando gauge.");
+    plane.setAttribute('material', `src: #gTorque; transparent: true;`);
+    plane.setAttribute('visible', 'true');
+    plane.setAttribute('rotation','0 0 0');
+    const mesh = plane.getObject3D('mesh');
+    if (mesh && mesh.material.map) {
+      mesh.material.map.needsUpdate = true;
     }
   });
 
   anchor.addEventListener("targetLost", () => {
-    console.log("Imagem perdida. Escondendo gauges.");
-    planes.forEach(p => document.getElementById(p).setAttribute('visible','false'));
-    document.getElementById('titulo').setAttribute('value', 'Aponte para o marcador...');
+    console.log("Imagem perdida. Escondendo gauge.");
+    plane.setAttribute('visible','false');
   });
-
 })();
 </script>
 
