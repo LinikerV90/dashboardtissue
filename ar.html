@@ -35,24 +35,15 @@
   vr-mode-ui="enabled: false"
   device-orientation-permission-ui="enabled: true"
 >
-  <!-- Camera -->
   <a-camera position="0 0 0"></a-camera>
 
-  <!-- Anchor para a imagem alvo -->
   <a-entity mindar-image-target="targetIndex: 0" id="anchor">
-      <!-- Título do motor -->
-      <a-text id="titulo"
-              value="Carregando..."
-              position="0 1 0"
-              align="center"
-              color="#00AEEF"
-              width="2">
-      </a-text>
+      <a-text id="titulo" value="Carregando..." position="0 0.9 0" align="center" color="#00AEEF" width="2"></a-text>
 
-      <!-- Planos para os gauges (posicionados horizontalmente para não sobrepor) -->
-      <a-plane id="planeTorque" position="-1 0.3 0" width="0.8" height="0.8"></a-plane>
-      <a-plane id="planeCorrente" position="0 0.3 0" width="0.8" height="0.8"></a-plane>
-      <a-plane id="planeTemp" position="1 0.3 0" width="0.8" height="0.8"></a-plane>
+      <!-- Planos para os gauges -->
+      <a-plane id="planeTorque" position="-0.7 0.3 0" width="0.6" height="0.6" visible="false"></a-plane>
+      <a-plane id="planeCorrente" position="0 0.3 0" width="0.6" height="0.6" visible="false"></a-plane>
+      <a-plane id="planeTemp" position="0.7 0.3 0" width="0.6" height="0.6" visible="false"></a-plane>
   </a-entity>
 </a-scene>
 
@@ -128,21 +119,34 @@
       gauges.correnteGauge.draw();
       gauges.temperaturaGauge.draw();
 
-      // Vincula os canvases aos planos do A-Frame
-      document.getElementById('planeTorque').setAttribute('material', 'src: #gTorque; transparent: true');
-      document.getElementById('planeCorrente').setAttribute('material', 'src: #gCorrente; transparent: true');
-      document.getElementById('planeTemp').setAttribute('material', 'src: #gTemperatura; transparent: true');
+      // Vincula os canvases aos planos e mostra-os
+      const planes = ['planeTorque','planeCorrente','planeTemp'];
+      const canvases = ['gTorque','gCorrente','gTemperatura'];
+      for(let i=0;i<planes.length;i++){
+        const plane = document.getElementById(planes[i]);
+        plane.setAttribute('material', `src: #${canvases[i]}; transparent: true`);
+        plane.setAttribute('visible', 'true');
+      }
 
-      // Atualizações contínuas enquanto a imagem estiver visível
-      setInterval(async () => {
-        const d = await fetchMotor(motorId);
-        gauges.torqueGauge.value = d.torque;
-        gauges.correnteGauge.value = d.corrente;
-        gauges.temperaturaGauge.value = d.temperatura;
-        gauges.torqueGauge.draw();
-        gauges.correnteGauge.draw();
-        gauges.temperaturaGauge.draw();
-      }, 8000);
+      // Atualizações contínuas
+      if(!anchor.updateInterval){
+        anchor.updateInterval = setInterval(async () => {
+          const d = await fetchMotor(motorId);
+          gauges.torqueGauge.value = d.torque;
+          gauges.correnteGauge.value = d.corrente;
+          gauges.temperaturaGauge.value = d.temperatura;
+          gauges.torqueGauge.draw();
+          gauges.correnteGauge.draw();
+          gauges.temperaturaGauge.draw();
+        }, 8000);
+      }
+    });
+
+    anchor.addEventListener("targetLost", () => {
+      console.log("Imagem perdida. Escondendo gauges.");
+      ['planeTorque','planeCorrente','planeTemp'].forEach(id => {
+        document.getElementById(id).setAttribute('visible','false');
+      });
     });
 
   } catch(err){
