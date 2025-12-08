@@ -65,29 +65,23 @@
     return new URLSearchParams(location.search).get(name) || '';
   }
 
-  async function fetchMotor(motorId){
-    try{
-      const tq = `select A,B,C,D,E where B='${motorId}' limit 1`;
-      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
-      const res = await fetch(url);
-      if(!res.ok) throw new Error('Erro ao acessar planilha');
-      const txt = await res.text();
-      const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}') + 1);
-      const obj = JSON.parse(jsonStr);
-      const row = obj.table.rows[0].c;
-      return {
-        id_aruco: row[0]?.v || 0,
-        nome: row[1]?.v || motorId,
-        torque: Number(row[2]?.v) || 0,
-        corrente: Number(row[3]?.v) || 0,
-        temperatura: Number(row[4]?.v) || 0
-      };
-    }catch(e){
-      showError(e.message);
-      return null;
-    }
-  }
+async function fetchMotor(id){
+  const tq = `select A,B,C,D,E where B='${id}' limit 1`; // se usar nome
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
 
+  const txt = await fetch(url).then(r => r.text());
+  const json = JSON.parse(txt.substring(txt.indexOf("{"), txt.lastIndexOf("}")+1));
+  const row = json.table.rows[0]?.c;
+  if(!row) throw new Error(`Motor "${id}" não encontrado na planilha.`);
+
+  return {
+    id: row[0]?.v,
+    nome: row[1]?.v,
+    torque: row[2]?.v,
+    corrente: row[3]?.v,
+    temperatura: row[4]?.v
+  };
+}
   // ================= GAUGES =================
   function createGauges(){
     const torqueGauge = new RadialGauge({
