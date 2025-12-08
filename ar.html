@@ -51,29 +51,16 @@
       <!-- Título do motor -->
       <a-text id="titulo"
               value="Carregando..."
-              position="0 1 0"
+              position="0 0.8 0"
               align="center"
               color="#00AEEF"
               width="2">
       </a-text>
 
-      <!-- Painel Torque -->
-      <a-plane position="-0.7 0.25 0"
-               width="0.9" height="0.9"
-               material="src: #gTorque; transparent: true">
-      </a-plane>
-
-      <!-- Painel Corrente -->
-      <a-plane position="0.7 0.25 0"
-               width="0.9" height="0.9"
-               material="src: #gCorrente; transparent: true">
-      </a-plane>
-
-      <!-- Painel Temperatura -->
-      <a-plane position="0 -0.6 0"
-               width="1.4" height="0.9"
-               material="src: #gTemperatura; transparent: true">
-      </a-plane>
+      <!-- Planos para gauges (serão preenchidos dinamicamente) -->
+      <a-plane id="planeTorque" position="-0.7 0 0" width="0.9" height="0.9" material="src:#gTorque; transparent:true" visible="false"></a-plane>
+      <a-plane id="planeCorrente" position="0 0 0" width="0.9" height="0.9" material="src:#gCorrente; transparent:true" visible="false"></a-plane>
+      <a-plane id="planeTemp" position="0.7 0 0" width="0.9" height="0.9" material="src:#gTemperatura; transparent:true" visible="false"></a-plane>
 
   </a-entity>
 </a-scene>
@@ -96,13 +83,13 @@
 
   async function fetchMotor(id){
     try {
-      const tq = `select A,B,C,D where A='${id}' limit 1`;
+      const tq = `select A,B,C,D where B='${id}' limit 1`;
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
       const txt = await fetch(url).then(r => r.text());
       const jsonStr = txt.substring(txt.indexOf('{'), txt.lastIndexOf('}')+1);
       const obj = JSON.parse(jsonStr);
       const row = (obj.table.rows && obj.table.rows[0]) ? obj.table.rows[0].c : null;
-      if(!row) throw new Error('Motor não encontrado na planilha.');
+      if(!row) throw new Error(`Motor "${id}" não encontrado na planilha.`);
       return {
         nome: row[0].v,
         torque: row[1].v,
@@ -139,38 +126,51 @@
 
   const gauges = createGauges();
 
-  try {
-    const motorId = getParam('motor');
-    if(!motorId) throw new Error('Parâmetro ?motor= ausente na URL.');
+  const motorId = getParam('motor');
+  if(!motorId){
+    showError('Parâmetro ?motor= ausente na URL.');
+    return;
+  }
 
-    // carregar dados iniciais
-    const data = await fetchMotor(motorId);
+  // Seleciona o anchor
+  const anchor = document.getElementById('anchor');
 
-    document.getElementById('titulo').setAttribute('value', data.nome);
+  anchor.addEventListener('targetFound', async () => {
+    console.log("Alvo detectado!");
+    try {
+      const data = await fetchMotor(motorId);
 
-    gauges.torqueGauge.value = data.torque;
-    gauges.correnteGauge.value = data.corrente;
-    gauges.temperaturaGauge.value = data.temperatura;
+      document.getElementById('titulo').setAttribute('value', data.nome);
 
-    gauges.torqueGauge.draw();
-    gauges.correnteGauge.draw();
-    gauges.temperaturaGauge.draw();
-
-    // atualizações contínuas
-    setInterval(async () => {
-      const d = await fetchMotor(motorId);
-      gauges.torqueGauge.value = d.torque;
-      gauges.correnteGauge.value = d.corrente;
-      gauges.temperaturaGauge.value = d.temperatura;
+      gauges.torqueGauge.value = data.torque;
+      gauges.correnteGauge.value = data.corrente;
+      gauges.temperaturaGauge.value = data.temperatura;
 
       gauges.torqueGauge.draw();
       gauges.correnteGauge.draw();
       gauges.temperaturaGauge.draw();
-    }, 8000);
 
-  } catch(err){
-    showError(err.message);
-  }
+      // torna os planos visíveis
+      document.getElementById('planeTorque').setAttribute('visible', true);
+      document.getElementById('planeCorrente').setAttribute('visible', true);
+      document.getElementById('planeTemp').setAttribute('visible', true);
+
+      // atualizações contínuas
+      setInterval(async () => {
+        const d = await fetchMotor(motorId);
+        gauges.torqueGauge.value = d.torque;
+        gauges.correnteGauge.value = d.corrente;
+        gauges.temperaturaGauge.value = d.temperatura;
+
+        gauges.torqueGauge.draw();
+        gauges.correnteGauge.draw();
+        gauges.temperaturaGauge.draw();
+      }, 8000);
+
+    } catch(e){
+      showError(e.message);
+    }
+  });
 
 })();
 </script>
