@@ -2,16 +2,10 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AR Teste Gauge</title>
-
-  <!-- A-Frame + MindAR -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-
-  <!-- Gauges -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
-
   <style>
     body { margin:0; overflow:hidden; background:#000; }
     canvas { visibility:hidden; position:absolute; left:-9999px; }
@@ -33,7 +27,7 @@
   <a-camera position="0 0 0"></a-camera>
 
   <a-entity mindar-image-target="targetIndex: 0" id="anchor">
-    <a-text value="Teste Gauge" position="0 1 0" align="center" color="#00AEEF" width="2"></a-text>
+    <a-text value="Gauge Teste" position="0 1 0" align="center" color="#00AEEF" width="2"></a-text>
     <a-plane id="planeTorque" position="0 0 0.01" width="1.2" height="1.2"></a-plane>
   </a-entity>
 </a-scene>
@@ -64,9 +58,8 @@
 
   anchor.addEventListener("targetFound", () => {
     console.log("Imagem detectada! Mostrando gauge.");
-    plane.setAttribute('material', `src: #gTorque; transparent: true;`);
+    plane.setAttribute('material', 'src: #gTorque; transparent: true;');
     plane.setAttribute('visible', 'true');
-    plane.setAttribute('rotation','0 0 0');
     const mesh = plane.getObject3D('mesh');
     if (mesh && mesh.material.map) {
       mesh.material.map.needsUpdate = true;
