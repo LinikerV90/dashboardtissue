@@ -1,143 +1,169 @@
  <!-- Desenvolvido por Liniker Venturini da Silva -->
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AR Motores – Suzano</title>
 
-  <!-- Gauges -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
   <!-- js-aruco2 -->
   <script src="https://cdn.jsdelivr.net/npm/js-aruco2@2.0.0/src/aruco.min.js"></script>
 
+  <!-- Canvas Gauges -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
+
   <style>
-    body, html { margin:0; padding:0; overflow:hidden; background:#000; }
-    video, canvas { position:absolute; top:0; left:0; width:100%; height:100%; }
-    canvas#gaugesCanvas { display:none; }
-    .label { position:absolute; color:#00AEEF; font-size:20px; text-align:center; width:100%; top:10px; }
+    body { margin:0; overflow:hidden; background:#000; }
+    video { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:0; }
+    canvas { display:none; } /* canvases para processar e gauges */
+    .error { position:absolute; top:10px; left:10px; color:#fff; background:rgba(0,0,0,0.6); padding:6px; border-radius:5px; z-index:10; display:none; }
   </style>
 </head>
 <body>
 
-<div class="label" id="motorName">Carregando...</div>
+<div class="error" id="errbox"></div>
 
-<!-- Video da câmera -->
-<video id="video" autoplay muted playsinline></video>
+<video id="video" autoplay playsinline></video>
 
-<!-- Canvas para processar o vídeo (não visível) -->
+<!-- Canvases para processar ArUco e criar gauges -->
 <canvas id="videoCanvas"></canvas>
-
-<!-- Canvas dos gauges -->
 <canvas id="gTorque" width="512" height="512"></canvas>
 <canvas id="gCorrente" width="512" height="512"></canvas>
 <canvas id="gTemperatura" width="512" height="512"></canvas>
 
+<!-- Cena A-Frame -->
+<a-scene embedded vr-mode-ui="enabled: false">
+  <a-entity camera></a-entity>
+</a-scene>
+
 <script>
 (async function(){
-  // ===========================
-  // 1. CONFIGURAÇÃO
-  // ===========================
   const SHEET_ID = "1W9OPl0BG72_6t0nGy1kaDqfIICkLgG8YnkD_Y5uCb4k";
   const SHEET_NAME = "SERVOS";
 
-  // Map ArUco ID → motorId (coluna NOME)
-  const ARUCO_MAP = {}; // preenchido dinamicamente via fetch da planilha
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('videoCanvas');
+  const ctx = canvas.getContext('2d');
 
-  // ===========================
-  // 2. GAUGES
-  // ===========================
-  function createGauges(){
+  const scene = document.querySelector('a-scene');
+
+  function showError(msg){
+    const e = document.getElementById('errbox');
+    e.style.display = 'block';
+    e.textContent = msg;
+    console.error(msg);
+  }
+
+  // ===== GAUGES =====
+  const gauges = {
+    torque: new RadialGauge({
+      renderTo:'gTorque', width:512, height:512, units:'Torque (Nm)',
+      minValue:0, maxValue:100, value:0
+    }).draw(),
+    corrente: new RadialGauge({
+      renderTo:'gCorrente', width:512, height:512, units:'Corrente (A)',
+      minValue:0, maxValue:100, value:0
+    }).draw(),
+    temperatura: new RadialGauge({
+      renderTo:'gTemperatura', width:512, height:512, units:'°C',
+      minValue:0, maxValue:120, value:0
+    }).draw()
+  };
+
+  function updateGauges(data){
+    gauges.torque.value = data.torque; gauges.torque.draw();
+    gauges.corrente.value = data.corrente; gauges.corrente.draw();
+    gauges.temperatura.value = data.temperatura; gauges.temperatura.draw();
+  }
+
+  // ===== BUSCAR DADOS =====
+  async function fetchMotorById(id){
+    const tq = `select A,B,C,D,E where A='${id}' limit 1`;
+    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${SHEET_NAME}&tqx=out:json&tq=${encodeURIComponent(tq)}`;
+    const txt = await fetch(url).then(r => r.text());
+    const json = JSON.parse(txt.substring(txt.indexOf("{"), txt.lastIndexOf("}")+1));
+    const row = json.table.rows[0].c;
     return {
-      torque: new RadialGauge({
-        renderTo:"gTorque", width:512, height:512, units:"Torque (Nm)",
-        minValue:0, maxValue:100, value:0, majorTicks:["0","20","40","60","80","100"]
-      }).draw(),
-      corrente: new RadialGauge({
-        renderTo:"gCorrente", width:512, height:512, units:"Corrente (A)",
-        minValue:0, maxValue:100, value:0, majorTicks:["0","20","40","60","80","100"]
-      }).draw(),
-      temperatura: new RadialGauge({
-        renderTo:"gTemperatura", width:512, height:512, units:"°C",
-        minValue:0, maxValue:120, value:0, majorTicks:["0","20","40","60","80","100","120"]
-      }).draw()
+      nome: row[1].v,
+      torque: row[2].v,
+      corrente: row[3].v,
+      temperatura: row[4].v
     };
   }
 
-  const gauges = createGauges();
-
-  // ===========================
-  // 3. FUNÇÃO PARA BUSCAR DADOS
-  // ===========================
-  async function fetchMotors(){
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(SHEET_NAME)}&tqx=out:json`;
-    const txt = await fetch(url).then(r => r.text());
-    const jsonStr = txt.substring(txt.indexOf("{"), txt.lastIndexOf("}")+1);
-    const obj = JSON.parse(jsonStr);
-    const rows = obj.table.rows;
-    const motors = {};
-    rows.forEach(r => {
-      const c = r.c;
-      if(c[0]) ARUCO_MAP[c[0].v] = { nome: c[1].v, torque: c[2].v, corrente: c[3].v, temperatura: c[4].v };
-    });
-    return motors;
-  }
-
-  await fetchMotors();
-
-  // ===========================
-  // 4. CONFIGURAÇÃO DA CÂMERA
-  // ===========================
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('videoCanvas');
-  const context = canvas.getContext('2d');
-
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-  video.srcObject = stream;
-
-  await new Promise(r => video.onloadedmetadata = r);
-
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-
-  // Detector ArUco
+  // ===== ARUCO =====
   const detector = new AR.Detector();
 
-  // ===========================
-  // 5. LOOP PRINCIPAL
-  // ===========================
-  function tick(){
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const imageData = context.getImageData(0,0,canvas.width,canvas.height);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" }});
+    video.srcObject = stream;
+  } catch(e){
+    showError("Erro ao acessar a câmera: "+e.message);
+    return;
+  }
+
+  video.onloadedmetadata = () => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    tick();
+  };
+
+  async function tick(){
+    ctx.drawImage(video, 0,0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0,0,canvas.width,canvas.height);
     const markers = detector.detect(imageData);
 
-    if(markers.length > 0){
-      // pega primeiro marcador detectado
-      const id = markers[0].id;
-      const motor = ARUCO_MAP[id];
-      if(motor){
-        document.getElementById("motorName").textContent = motor.nome;
-        gauges.torque.value = motor.torque; gauges.torque.draw();
-        gauges.corrente.value = motor.corrente; gauges.corrente.draw();
-        gauges.temperatura.value = motor.temperatura; gauges.temperatura.draw();
-      }
+    for(const marker of markers){
+      const id = marker.id;
+      const data = await fetchMotorById(id);
+      updateGauges(data);
+
+      // Remove anchors anteriores
+      scene.querySelectorAll('[data-ar-anchor]').forEach(a=>a.remove());
+
+      // Cria nova âncora sobre marcador
+      const anchor = document.createElement('a-entity');
+      anchor.setAttribute('position','0 0 0');
+      anchor.setAttribute('data-ar-anchor','true');
+
+      // Título
+      const title = document.createElement('a-text');
+      title.setAttribute('value', data.nome);
+      title.setAttribute('position','0 1 0');
+      title.setAttribute('align','center');
+      title.setAttribute('color','#00AEEF');
+      title.setAttribute('width','2');
+      anchor.appendChild(title);
+
+      // Planes com gauges
+      const planeTorque = document.createElement('a-plane');
+      planeTorque.setAttribute('position','-0.7 0.25 0');
+      planeTorque.setAttribute('width','0.9'); planeTorque.setAttribute('height','0.9');
+      planeTorque.setAttribute('material','src: #gTorque; transparent: true');
+      anchor.appendChild(planeTorque);
+
+      const planeCorr = document.createElement('a-plane');
+      planeCorr.setAttribute('position','0.7 0.25 0');
+      planeCorr.setAttribute('width','0.9'); planeCorr.setAttribute('height','0.9');
+      planeCorr.setAttribute('material','src: #gCorrente; transparent: true');
+      anchor.appendChild(planeCorr);
+
+      const planeTemp = document.createElement('a-plane');
+      planeTemp.setAttribute('position','0 -0.6 0');
+      planeTemp.setAttribute('width','1.4'); planeTemp.setAttribute('height','0.9');
+      planeTemp.setAttribute('material','src: #gTemperatura; transparent: true');
+      anchor.appendChild(planeTemp);
+
+      scene.appendChild(anchor);
     }
 
     requestAnimationFrame(tick);
   }
 
-  tick();
-
-  // ===========================
-  // 6. ATUALIZAÇÃO PERIÓDICA
-  // ===========================
-  setInterval(async () => {
-    await fetchMotors();
-  }, 10000);
-
 })();
 </script>
-
 </body>
 </html>
