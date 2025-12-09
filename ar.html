@@ -222,9 +222,24 @@ EM PARCERIA COM SUZANO S.A.-->
       nomeMotor = data.id;
       document.getElementById("motorName").innerText = nomeMotor;
 
-      desenharGauge("gaugeTorqueCanvas", data.torque, 0, 100, "%");
+      // 🔥 CORREÇÃO IMPORTANTE: CONVERTER PARA FLOAT 🔥
+      const torque = parseFloat(data.torque);
+      const corrente = parseFloat(data.corrente);
+      const temperatura = parseFloat(data.temperatura);
+  
+      // Limites reais / recomendados
+      const torqueMax = 100;
+      const correnteMax = 160;   // ajuste conforme desejar
+      const temperaturaMax = 150;
+  
+      // Desenhar corretamente
+      desenharGauge("gaugeTorqueCanvas", torque, 0, torqueMax, "%");
+      desenharGauge("gaugeCorrenteCanvas", corrente, 0, correnteMax, "A");
+      desenharGauge("gaugeTempCanvas", temperatura, 0, temperaturaMax, "°C");
+   
+     /* desenharGauge("gaugeTorqueCanvas", data.torque, 0, 100, "%");
       desenharGauge("gaugeCorrenteCanvas", data.corrente, 0, 100, "A");
-      desenharGauge("gaugeTempCanvas", data.temperatura, 0, 150, "°C");
+      desenharGauge("gaugeTempCanvas", data.temperatura, 0, 150, "°C");*/
 
     } catch (err) {
       console.error(err);
