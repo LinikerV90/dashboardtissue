@@ -1,57 +1,154 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dashboard Tissue</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --azul-suzano: #0051A2;
+      --azul-claro: #00B2E2;
+      --azul-escuro: #002C6C;
+      --branco: #ffffff;
+      --cinza-fundo: #f0f5fb;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(145deg, var(--cinza-fundo), var(--branco));
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      background-color: var(--branco);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 60px;
+    }
+    
+    .coluna {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header img {
+      height: 50px;
+    }
+
+    .container {
+      flex: 1;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      background-color: #f4f4f9;
-      margin: 0;
+      padding: 40px 20px;
     }
-    .container {
-      text-align: center;
-      padding: 20px;
-      border-radius: 10px;
+
+    .content-box {
       background-color: #fff;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 40px 30px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      animation: fadeIn 0.8s ease-in-out;
+      max-width: 700px;
+      width: 100%;
     }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
     h1 {
-      font-size: 32px;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
+
     p {
-      font-size: 18px;
       margin-bottom: 30px;
     }
-    a button {
-      padding: 12px 25px;
-      font-size: 18px;
-      color: #fff;
-      background-color: #0073e6;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      text-decoration: none;
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
     }
-    a button:hover {
-      background-color: #005bb5;
+
+    .btn {
+      background-color: var(--azul-suzano);
+      color: var(--branco);
+      border: none;
+      padding: 15px 25px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      min-width: 180px;
+    }
+
+    .btn:hover {
+      background-color: var(--azul-claro);
+    }
+
+    footer {
+      background-color: #fff;
+      padding: 15px;
+      text-align: center;
+      font-size: 14px;
+      color: #555;
+      box-shadow: 0 -2px 6px rgba(0,0,0,0.05);
     }
   </style>
 </head>
 <body>
+
+  <header>
+    <img src="suzano-logo-branco.png" alt="Suzano Logo" />
+  </header>
+
   <div class="container">
-    <h1>Bem-vindo ao Dashboard Tissue</h1>
-    <p>Clique abaixo para acessar o sistema:</p>
-    <a href="https://sites.google.com/view/conversao-mu/inicio" target="_blank">
-      <button>Acessar Dashboard</button>
-    </a>
+    <div class="content-box">
+      <h1>Dashboard Tissue</h1>
+      <p>Selecione uma área para visualizar os dados:</p>
+
+        <div class="buttons">
+      <div class="coluna">
+        <a href="maquina.html"><button class="btn">Máquina Tissue</button></a>
+        <a href="https://0c2f5530203f.ngrok-free.app/ui/#!/17?socketid=vlmiyPxXKrJD6lviAAAP" target="_blank">
+          <button class="btn">Motores Máquina</button>
+        </a>
+      </div>
+      <div class="coluna">
+        <a href="conversao.html"><button class="btn">Conversão Tissue</button></a>
+        <a href="https://script.google.com/macros/s/AKfycbxyB9fCxBgb3oqMscWkTvjTSTpGz0UjlsYqENGbxHXPcwiRZObaD7EaVw04jxbQqgLs/exec" target="_blank">
+          <button class="btn">Motores Conversão</button>
+        </a>
+      </div>
+    </div>
+    </div>
   </div>
+
+  <footer>
+    Desenvolvido por Liniker Venturini – ©2025
+  </footer>
+
 </body>
 </html>
